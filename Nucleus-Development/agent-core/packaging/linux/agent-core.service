@@ -1,0 +1,26 @@
+[Unit]
+Description=Agent Core IoT Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/agent-core --config /etc/agent-core/config.json
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/agent-core
+
+# Resource limits
+CPUQuota=60%
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

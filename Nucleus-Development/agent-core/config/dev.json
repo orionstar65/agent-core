@@ -1,0 +1,35 @@
+{
+  "backend": {
+    "baseUrl": "https://api.nucleus.example"
+  },
+  "identity": {
+    "isGateway": false,
+    "deviceSerial": "",
+    "gatewayId": ""
+  },
+  "tunnelInfo": {
+    "enabled": false
+  },
+  "mqtt": {
+    "host": "mqtt.nucleus.example",
+    "port": 8883,
+    "keepalive": 30
+  },
+  "cert": {
+    "storeHint": "OS"
+  },
+  "retry": {
+    "maxAttempts": 5,
+    "baseMs": 500,
+    "maxMs": 8000
+  },
+  "resource": {
+    "cpuMaxPct": 60,
+    "memMaxMB": 512,
+    "netMaxKBps": 256
+  },
+  "logging": {
+    "level": "info",
+    "json": false
+  }
+}

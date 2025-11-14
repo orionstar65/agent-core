@@ -1,0 +1,18 @@
+{
+  "extensions": [
+    {
+      "name": "tunnel",
+      "execPath": "./ext-tunnel",
+      "args": ["--config", "config/tunnel.json"],
+      "critical": true,
+      "enabled": false
+    },
+    {
+      "name": "ps-exec",
+      "execPath": "./ext-ps",
+      "args": [],
+      "critical": false,
+      "enabled": false
+    }
+  ]
+}
