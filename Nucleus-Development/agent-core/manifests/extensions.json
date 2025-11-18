@@ -1,18 +1,21 @@
 {
+  "comment": "Extension manifest for agent-core. Extensions are separate executables.",
   "extensions": [
     {
       "name": "tunnel",
-      "execPath": "./ext-tunnel",
+      "execPath": "../extensions/tunnel/build/ext-tunnel",
       "args": ["--config", "config/tunnel.json"],
       "critical": true,
-      "enabled": false
+      "enabled": false,
+      "description": "VPN/IPsec tunnel management for secure connectivity"
     },
     {
       "name": "ps-exec",
-      "execPath": "./ext-ps",
+      "execPath": "../extensions/ps-exec/build/ext-ps",
       "args": [],
       "critical": false,
-      "enabled": false
+      "enabled": false,
+      "description": "PowerShell script execution for Windows management tasks"
     }
   ]
 }

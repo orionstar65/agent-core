@@ -1,6 +1,8 @@
 #include "agent/bus.hpp"
 #include <iostream>
 #include <stdexcept>
+#include <map>
+#include <functional>
 
 // TODO: Add ZeroMQ includes when library is available
 // #include <zmq.hpp>

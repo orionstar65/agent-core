@@ -1,6 +1,7 @@
 #include "agent/telemetry.hpp"
 #include <iostream>
 #include <map>
+#include <vector>
 #include <mutex>
 
 namespace agent {

@@ -1,5 +1,6 @@
 #include "agent/mqtt_client.hpp"
 #include <iostream>
+#include <map>
 
 // TODO: add MQTT library includes (e.g. Paho MQTT C++)
 // #include <mqtt/async_client.h>

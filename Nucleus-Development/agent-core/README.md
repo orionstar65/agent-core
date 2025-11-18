@@ -40,7 +40,7 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 ### Prerequisites
 - CMake 3.15 or higher
 - C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
-- (Future) ZeroMQ, OpenSSL, nlohmann/json
+- ZeroMQ, OpenSSL, nlohmann/json
 
 ### Quick Start
 
