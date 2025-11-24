@@ -25,6 +25,12 @@ endif()
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+# Add cmake modules to path
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+# Find ZeroMQ
+include(FindZeroMQ)
+
 # Source files
 set(AGENT_CORE_SOURCES
     src/main.cpp
@@ -35,6 +41,7 @@ set(AGENT_CORE_SOURCES
     src/reg/registration_ssm.cpp
     src/mqtt/mqtt_client.cpp
     src/bus/zmq_bus.cpp
+    src/bus/envelope_serialization.cpp
     src/ext/extension_manager.cpp
     src/res/resource_monitor.cpp
     src/util/retry.cpp
@@ -58,6 +65,13 @@ if(WIN32)
     target_link_libraries(agent-core PRIVATE ws2_32)
 else()
     target_link_libraries(agent-core PRIVATE pthread)
+endif()
+
+# ZeroMQ
+if(ZMQ_FOUND)
+    target_include_directories(agent-core PRIVATE ${ZMQ_INCLUDE_DIRS})
+    target_link_libraries(agent-core PRIVATE ${ZMQ_LIBRARIES})
+    target_compile_definitions(agent-core PRIVATE HAVE_ZMQ)
 endif()
 
 # Installation

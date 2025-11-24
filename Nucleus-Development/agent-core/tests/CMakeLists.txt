@@ -1,18 +1,24 @@
-# Tests will be added here
-# For now, just a placeholder
+find_package(GTest QUIET)
 
-# Example test structure:
-# find_package(GTest REQUIRED)
-# 
-# add_executable(unit_tests
-#     unit/test_config.cpp
-#     unit/test_identity.cpp
-#     unit/test_retry.cpp
-# )
-# 
-# target_link_libraries(unit_tests PRIVATE GTest::GTest GTest::Main)
-# target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/include)
-# 
-# add_test(NAME UnitTests COMMAND unit_tests)
+if(NOT GTest_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+    )
+    set(BUILD_GMOCK ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
 
-message(STATUS "Tests directory configured (tests not yet implemented)")
+add_executable(test_bus
+    unit/test_bus.cpp
+    ../src/bus/envelope_serialization.cpp
+)
+
+target_link_libraries(test_bus PRIVATE GTest::gtest GTest::gtest_main GTest::gmock)
+target_include_directories(test_bus PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
+add_test(NAME BusTests COMMAND test_bus)
+
+message(STATUS "Bus tests configured")

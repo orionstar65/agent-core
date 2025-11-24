@@ -14,6 +14,8 @@ struct Envelope {
     int64_t ts_ms{0};
 };
 
+class Logger;
+
 class Bus {
 public:
     virtual ~Bus() = default;
@@ -30,6 +32,6 @@ public:
 };
 
 // Create ZeroMQ-based bus implementation
-std::unique_ptr<Bus> create_zmq_bus();
+std::unique_ptr<Bus> create_zmq_bus(Logger* logger = nullptr);
 
 }
