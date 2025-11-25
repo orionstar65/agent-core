@@ -1,15 +1,16 @@
 #include "agent/config.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
 
-// Simple JSON parser for MVP - will use nlohmann/json or similar later
+using json = nlohmann::json;
+
 namespace agent {
 
 std::unique_ptr<Config> load_config(const std::string& path) {
     auto config = std::make_unique<Config>();
     
-    // For now, return default config with basic file existence check
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Warning: Could not open config file: " << path 
@@ -17,9 +18,120 @@ std::unique_ptr<Config> load_config(const std::string& path) {
         return config;
     }
     
-    // TODO: Parse JSON and populate config
-    // For MVP, just log that we'd parse it
-    std::cout << "Config file found: " << path << " (parsing not yet implemented)\n";
+    try {
+        json j = json::parse(file);
+        
+        // Parse backend
+        if (j.contains("backend")) {
+            auto& backend = j["backend"];
+            if (backend.contains("baseUrl")) {
+                config->backend.base_url = backend["baseUrl"].get<std::string>();
+            }
+            if (backend.contains("authPath")) {
+                config->backend.auth_path = backend["authPath"].get<std::string>();
+            }
+        }
+        
+        // Parse identity
+        if (j.contains("identity")) {
+            auto& identity = j["identity"];
+            if (identity.contains("isGateway")) {
+                config->identity.is_gateway = identity["isGateway"].get<bool>();
+            }
+            if (identity.contains("deviceSerial")) {
+                config->identity.device_serial = identity["deviceSerial"].get<std::string>();
+            }
+            if (identity.contains("gatewayId")) {
+                config->identity.gateway_id = identity["gatewayId"].get<std::string>();
+            }
+            if (identity.contains("uuid")) {
+                config->identity.uuid = identity["uuid"].get<std::string>();
+            }
+        }
+        
+        // Parse tunnel
+        if (j.contains("tunnelInfo") && j["tunnelInfo"].contains("enabled")) {
+            config->tunnel.enabled = j["tunnelInfo"]["enabled"].get<bool>();
+        }
+        
+        // Parse MQTT
+        if (j.contains("mqtt")) {
+            auto& mqtt = j["mqtt"];
+            if (mqtt.contains("host")) {
+                config->mqtt.host = mqtt["host"].get<std::string>();
+            }
+            if (mqtt.contains("port")) {
+                config->mqtt.port = mqtt["port"].get<int>();
+            }
+            if (mqtt.contains("keepalive")) {
+                config->mqtt.keepalive_s = mqtt["keepalive"].get<int>();
+            }
+        }
+        
+        // Parse cert
+        if (j.contains("cert")) {
+            auto& cert = j["cert"];
+            if (cert.contains("storeHint")) {
+                config->cert.store_hint = cert["storeHint"].get<std::string>();
+            }
+            if (cert.contains("certPath")) {
+                config->cert.cert_path = cert["certPath"].get<std::string>();
+            }
+            if (cert.contains("renewDays")) {
+                config->cert.renew_days = cert["renewDays"].get<int>();
+            }
+        }
+        
+        // Parse retry
+        if (j.contains("retry")) {
+            auto& retry = j["retry"];
+            if (retry.contains("maxAttempts")) {
+                config->retry.max_attempts = retry["maxAttempts"].get<int>();
+            }
+            if (retry.contains("baseMs")) {
+                config->retry.base_ms = retry["baseMs"].get<int>();
+            }
+            if (retry.contains("maxMs")) {
+                config->retry.max_ms = retry["maxMs"].get<int>();
+            }
+        }
+        
+        // Parse resource
+        if (j.contains("resource")) {
+            auto& resource = j["resource"];
+            if (resource.contains("cpuMaxPct")) {
+                config->resource.cpu_max_pct = resource["cpuMaxPct"].get<int>();
+            }
+            if (resource.contains("memMaxMB")) {
+                config->resource.mem_max_mb = resource["memMaxMB"].get<int>();
+            }
+            if (resource.contains("netMaxKBps")) {
+                config->resource.net_max_kbps = resource["netMaxKBps"].get<int>();
+            }
+        }
+        
+        // Parse logging
+        if (j.contains("logging")) {
+            auto& logging = j["logging"];
+            if (logging.contains("level")) {
+                config->logging.level = logging["level"].get<std::string>();
+            }
+            if (logging.contains("json")) {
+                config->logging.json = logging["json"].get<bool>();
+            }
+        }
+        
+        std::cout << "Config loaded successfully from: " << path << "\n";
+        std::cout << "  Backend URL: " << config->backend.base_url << "\n";
+        std::cout << "  Device Serial: " << config->identity.device_serial << "\n";
+        std::cout << "  UUID: " << config->identity.uuid << "\n";
+        std::cout << "  Cert Path: " << config->cert.cert_path << "\n";
+        std::cout << "  Tunnel Enabled: " << (config->tunnel.enabled ? "true" : "false") << "\n";
+        
+    } catch (const json::exception& e) {
+        std::cerr << "Error parsing JSON config: " << e.what() << "\n";
+        throw std::runtime_error("Failed to parse config file");
+    }
     
     return config;
 }

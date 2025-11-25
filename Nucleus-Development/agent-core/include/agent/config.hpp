@@ -8,12 +8,14 @@ namespace agent {
 struct Config {
     struct Backend {
         std::string base_url{"https://api.nucleus.example.tbd"};
+        std::string auth_path{"/deviceservices/api/Authentication/devicecertificatevalid/"};
     } backend;
 
     struct Identity {
         bool is_gateway{false};
         std::string device_serial;
         std::string gateway_id;
+        std::string uuid;
     } identity;
 
     struct TunnelInfo {
@@ -29,6 +31,7 @@ struct Config {
     struct Cert {
         std::string store_hint{"OS"};
         int renew_days{30};
+        std::string cert_path;
     } cert;
 
     struct Retry {

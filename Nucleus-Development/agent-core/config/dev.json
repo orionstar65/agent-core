@@ -1,11 +1,13 @@
 {
   "backend": {
-    "baseUrl": "https://api.nucleus.example"
+    "baseUrl": "https://35.159.104.91:443",
+    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/"
   },
   "identity": {
     "isGateway": false,
-    "deviceSerial": "",
-    "gatewayId": ""
+    "deviceSerial": "200000",
+    "gatewayId": "",
+    "uuid": "a1635025-2723-4ffa-b608-208578d6128f"
   },
   "tunnelInfo": {
     "enabled": false
@@ -16,7 +18,8 @@
     "keepalive": 30
   },
   "cert": {
-    "storeHint": "OS"
+    "storeHint": "OS",
+    "certPath": "../cert_base64(200000).txt"
   },
   "retry": {
     "maxAttempts": 5,

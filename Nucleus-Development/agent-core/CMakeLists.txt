@@ -22,6 +22,9 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find required packages
+find_package(CURL REQUIRED)
+
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -31,6 +34,7 @@ set(AGENT_CORE_SOURCES
     src/config/config_json.cpp
     src/identity/identity.cpp
     src/net/net_path_selector.cpp
+    src/net/https_client.cpp
     src/auth/auth_manager.cpp
     src/reg/registration_ssm.cpp
     src/mqtt/mqtt_client.cpp
@@ -52,6 +56,9 @@ endif()
 
 # Main executable
 add_executable(agent-core ${AGENT_CORE_SOURCES})
+
+# Link libraries
+target_link_libraries(agent-core PRIVATE CURL::libcurl)
 
 # Platform-specific libraries
 if(WIN32)

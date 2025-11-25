@@ -46,6 +46,7 @@ config/prod.json
 *.key
 *.crt
 *.pfx
+*cert_base64*
 
 # Third-party
 third_party/

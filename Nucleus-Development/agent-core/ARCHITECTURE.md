@@ -464,26 +464,6 @@ sc start AgentCore
 - Restore previous binaries
 - Restart service
 
-## Future Enhancements
-
-### Short Term
-- JSON parsing (nlohmann/json)
-- ZeroMQ integration
-- Real X.509 handling
-- MQTT client (Paho)
-
-### Medium Term
-- Extension sandboxing (capabilities)
-- Distributed tracing (OpenTelemetry)
-- Metrics export (Prometheus)
-- Health endpoint (HTTP)
-
-### Long Term
-- Multi-tenancy
-- Hot reload (extensions, config)
-- Edge ML inference
-- OTA updates
-
 ## References
 
 - [ZeroMQ Guide](https://zguide.zeromq.org/)

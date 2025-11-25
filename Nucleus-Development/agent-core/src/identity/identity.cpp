@@ -20,11 +20,13 @@ Identity discover_identity(const Config& config) {
         identity.is_gateway = config.identity.is_gateway;
         identity.device_serial = config.identity.device_serial;
         identity.gateway_id = config.identity.gateway_id;
+        identity.uuid = config.identity.uuid;
         
         std::cout << "Identity from config: " 
                   << (identity.is_gateway ? "Gateway " + identity.gateway_id 
                                           : "Device " + identity.device_serial) 
                   << "\n";
+        std::cout << "  UUID: " << identity.uuid << "\n";
         return identity;
     }
     

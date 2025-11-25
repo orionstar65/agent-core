@@ -40,7 +40,10 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 ### Prerequisites
 - CMake 3.15 or higher
 - C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
-- ZeroMQ, OpenSSL, nlohmann/json
+- libcurl (for HTTPS communication)
+- nlohmann/json (for JSON parsing)
+- ZeroMQ (for extension IPC, future)
+- OpenSSL (for TLS, future)
 
 ### Quick Start
 
@@ -49,7 +52,7 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
 # Build
-cmake --build build
+cmake --build buildient_(create_https_client()) {
 
 # Run tests (when implemented)
 ctest --test-dir build
@@ -80,14 +83,48 @@ cmake --build build
 See `config/example.json` for full configuration schema.
 
 Key configuration sections:
-- `backend`: API endpoint
-- `identity`: Device/Gateway identification
+- `backend`: API endpoint and authentication path
+- `identity`: Device/Gateway identification (serial number, UUID)
 - `tunnelInfo`: Tunnel extension control
 - `mqtt`: MQTT broker settings
-- `cert`: Certificate management
-- `retry`: Backoff and circuit breaker
+- `cert`: Certificate management (path to certificate file)
+- `retry`: Backoff and circuit breaker (max attempts, delays)
 - `resource`: CPU/Memory/Network budgets
 - `logging`: Log level and format
+
+### Authentication
+
+Agent Core authenticates with the backend using X.509 certificates:
+
+1. Certificate is loaded from the path specified in `cert.certPath`
+2. HTTPS GET request is sent to `backend.baseUrl + backend.authPath + serialNumber + uuid`
+3. Certificate is passed in the `ARS-ClientCert` header
+4. Request includes device metadata in JSON body
+5. Response 200 indicates successful authentication
+6. Network errors and 5xx errors are retried according to retry policy
+7. 4xx errors (client errors) are not retried
+
+**Example Configuration:**
+```json
+{
+  "backend": {
+    "baseUrl": "https://35.159.104.91:443",
+    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/"
+  },
+  "identity": {
+    "deviceSerial": "200000",
+    "uuid": "a1635025-2723-4ffa-b608-208578d6128f"
+  },
+  "cert": {
+    "certPath": "../cert_base64(200000).txt"
+  },
+  "retry": {
+    "maxAttempts": 5,
+    "baseMs": 500,
+    "maxMs": 8000
+  }
+}
+```
 
 ### As a Service
 
@@ -210,9 +247,13 @@ cmake --build build --target unit_tests
 
 ### Integration Tests
 ```bash
-cmake --build build --target integration_tests
-./build/tests/integration_tests
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
+
+**Available Tests:**
+- Authentication integration tests (network connectivity required)
 
 ### Chaos Testing
 ```bash
