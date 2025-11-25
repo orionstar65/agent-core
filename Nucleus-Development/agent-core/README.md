@@ -239,21 +239,28 @@ agent-core/
 
 ## Testing
 
-### Unit Tests
+### Build with Tests Enabled
+
 ```bash
-cmake --build build --target unit_tests
-./build/tests/unit_tests
+# Configure with testing enabled
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+
+# Build all targets including tests
+cmake --build build
 ```
 
-### Integration Tests
+### Run Tests
+
 ```bash
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
+# Run all tests using CTest
 ctest --test-dir build --output-on-failure
+
+# Or run a specific test directly
+./build/tests/test_auth
 ```
 
 **Available Tests:**
-- Authentication integration tests (network connectivity required)
+- `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 
 ### Chaos Testing
 ```bash
