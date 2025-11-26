@@ -235,7 +235,7 @@ agent-core/
 1. Define interface in `include/agent/`
 2. Implement in `src/`
 3. Register in `main.cpp` dependency graph
-4. Add unit tests in `tests/unit/`
+4. Add integration tests in `tests/integration/`
 
 ## Testing
 
@@ -256,11 +256,39 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 
 # Or run a specific test directly
-./build/tests/test_auth
+./build/tests/test_auth  # Authentication integration tests
+./build/tests/test_zmq   # ZeroMQ bus integration tests
 ```
 
 **Available Tests:**
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
+- `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
+
+### ZeroMQ Integration Test
+
+The ZeroMQ integration test verifies the bus communication between agent-core and extensions:
+
+```bash
+# First, ensure the sample extension is built
+cd ../extensions/sample
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cd ../../agent-core
+
+# Run the ZeroMQ integration test
+./build/tests/test_zmq
+```
+
+The test will:
+1. Launch the sample extension automatically
+2. Send a request via ZeroMQ REQ/REP pattern
+3. Verify the reply and correlation ID round trip
+4. Test correlation ID preservation
+5. Clean up by stopping the extension
+
+**Prerequisites:**
+- Sample extension must be built at `extensions/sample/build/sample-ext`
+- ZeroMQ must be installed and available
 
 ### Chaos Testing
 ```bash

@@ -1,5 +1,9 @@
 # Integration tests
 
+# Add cmake modules to path for ZeroMQ detection
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+include(FindZeroMQ)
+
 # Collect all source files needed for integration tests (excluding main.cpp)
 set(AGENT_LIB_SOURCES
     ../src/config/config_json.cpp
@@ -10,6 +14,7 @@ set(AGENT_LIB_SOURCES
     ../src/reg/registration_ssm.cpp
     ../src/mqtt/mqtt_client.cpp
     ../src/bus/zmq_bus.cpp
+    ../src/bus/envelope_serialization.cpp
     ../src/ext/extension_manager.cpp
     ../src/res/resource_monitor.cpp
     ../src/util/retry.cpp
@@ -40,7 +45,30 @@ else()
     target_link_libraries(test_auth PRIVATE pthread)
 endif()
 
-# Register test with CTest
+# Integration test for ZeroMQ
+add_executable(test_zmq
+    integration/test_zmq.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_zmq PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_zmq PRIVATE CURL::libcurl)
+
+# ZeroMQ
+if(ZMQ_FOUND)
+    target_include_directories(test_zmq PRIVATE ${ZMQ_INCLUDE_DIRS})
+    target_link_libraries(test_zmq PRIVATE ${ZMQ_LIBRARIES})
+    target_compile_definitions(test_zmq PRIVATE HAVE_ZMQ)
+endif()
+
+if(WIN32)
+    target_link_libraries(test_zmq PRIVATE ws2_32)
+else()
+    target_link_libraries(test_zmq PRIVATE pthread)
+endif()
+
+# Register tests with CTest
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth)
+add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq)
 
 message(STATUS "Integration tests configured")

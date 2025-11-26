@@ -16,6 +16,7 @@
 #include <memory>
 #include <thread>
 #include <chrono>
+#include <map>
 
 using namespace agent;
 
