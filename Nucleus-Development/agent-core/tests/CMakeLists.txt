@@ -67,8 +67,8 @@ else()
     target_link_libraries(test_zmq PRIVATE pthread)
 endif()
 
-# Register tests with CTest
-add_test(NAME AuthenticationIntegrationTest COMMAND test_auth)
-add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq)
+# Register tests with CTest and set working directory
+add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 message(STATUS "Integration tests configured")

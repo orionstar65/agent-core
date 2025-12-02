@@ -42,8 +42,12 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 - C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
 - libcurl (for HTTPS communication)
 - nlohmann/json (for JSON parsing)
-- ZeroMQ (for extension IPC, future)
-- OpenSSL (for TLS, future)
+- ZeroMQ (libzmq + cppzmq for extension IPC)
+
+**Install on Ubuntu/Debian:**
+```bash
+sudo apt-get install -y build-essential cmake libcurl4-openssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev
+```
 
 ### Quick Start
 
@@ -52,10 +56,12 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
 # Build
-cmake --build buildient_(create_https_client()) {
+cmake --build build
 
-# Run tests (when implemented)
-ctest --test-dir build
+# Run tests
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 ### Build Variants

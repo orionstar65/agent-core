@@ -14,8 +14,8 @@ ExtensionSpec create_test_extension_spec() {
     ExtensionSpec spec;
     spec.name = "sample-ext";
     // Test executable is at: build/tests/test_zmq
-    // Extension should be at: ../../extensions/sample/build/sample-ext
-    spec.exec_path = "../extensions/sample/build/sample-ext";
+    // Extension should be at: ../../../extensions/sample/build/sample-ext
+    spec.exec_path = "../../../extensions/sample/build/sample-ext";
     spec.args = {};
     spec.critical = false;
     return spec;

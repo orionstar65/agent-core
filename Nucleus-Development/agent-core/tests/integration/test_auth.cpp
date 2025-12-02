@@ -11,7 +11,7 @@ Config create_test_config() {
     Config config;
     config.backend.base_url = "https://35.159.104.91:443";
     config.backend.auth_path = "/deviceservices/api/Authentication/devicecertificatevalid/";
-    config.cert.cert_path = "../../../cert_base64(200000).txt";
+    config.cert.cert_path = "../../cert_base64(200000).txt";
     config.retry.max_attempts = 3;
     config.retry.base_ms = 500;
     config.retry.max_ms = 5000;

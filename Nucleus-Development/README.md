@@ -188,23 +188,68 @@ Agent-core will:
 
 ## Testing
 
-### Unit Tests
+### Build All Components with Testing
 
 ```bash
+# Build agent-core with tests
 cd agent-core
-cmake -S . -B build -DBUILD_TESTING=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
 cmake --build build
-ctest --test-dir build
+
+# Build sample extension (required for ZeroMQ tests)
+cd ../extensions/sample
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+cd ../../agent-core
 ```
 
-### Integration Tests
-
-Extensions can be tested independently before integration:
+### Run All Tests
 
 ```bash
-# Test extension standalone
-cd extensions/tunnel
-./build/ext-tunnel --config ./test-config.json
+# From agent-core directory
+ctest --test-dir build --output-on-failure
+```
+
+### Available Tests
+
+1. **Authentication Integration Test** (`test_auth`)
+   - Tests HTTPS authentication with backend
+   - Validates X.509 certificate loading
+   - Tests retry logic for network errors
+   - **Requirements**: Network connectivity, certificate file at `agent-core/cert_base64(200000).txt`
+
+2. **ZeroMQ Integration Test** (`test_zmq`)
+   - Tests ZeroMQ bus communication
+   - Validates extension process management
+   - Tests REQ/REP pattern and correlation ID preservation
+   - **Requirements**: Sample extension built, ZeroMQ installed
+
+### Run Individual Tests
+
+```bash
+# Authentication test only
+cd agent-core/build/tests
+./test_auth
+
+# ZeroMQ test only
+./test_zmq
+```
+
+### Test Extensions Independently
+
+```bash
+# Test sample extension standalone
+cd extensions/sample
+./build/sample-ext
+
+# Test with agent-core (manual)
+# Terminal 1: Run extension
+cd extensions/sample/build
+./sample-ext
+
+# Terminal 2: Run agent-core
+cd agent-core
+./build/agent-core --config ./config/dev.json
 ```
 
 ## Platform Support
