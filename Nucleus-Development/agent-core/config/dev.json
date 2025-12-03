@@ -1,7 +1,9 @@
 {
   "backend": {
     "baseUrl": "https://35.159.104.91:443",
-    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/"
+    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/",
+    "isRegisteredPath": "/deviceservices/api/devicemanagement/isdeviceregistered/",
+    "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/"
   },
   "identity": {
     "isGateway": false,
@@ -19,7 +21,7 @@
   },
   "cert": {
     "storeHint": "OS",
-    "certPath": "../cert_base64(200000).txt"
+    "certPath": "./cert_base64(200000).txt"
   },
   "retry": {
     "maxAttempts": 5,
@@ -34,5 +36,8 @@
   "logging": {
     "level": "info",
     "json": false
+  },
+  "ssm": {
+    "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
   }
 }

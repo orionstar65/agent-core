@@ -1,11 +1,15 @@
 {
   "backend": {
-    "baseUrl": "https://api.nucleus.example"
+    "baseUrl": "https://api.nucleus.example",
+    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/",
+    "isRegisteredPath": "/deviceservices/api/devicemanagement/isdeviceregistered/",
+    "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/"
   },
   "identity": {
     "isGateway": false,
     "deviceSerial": "",
-    "gatewayId": ""
+    "gatewayId": "",
+    "uuid": ""
   },
   "tunnelInfo": {
     "enabled": false
@@ -16,7 +20,8 @@
     "keepalive": 30
   },
   "cert": {
-    "storeHint": "OS"
+    "storeHint": "OS",
+    "certPath": "./cert_base64.txt"
   },
   "retry": {
     "maxAttempts": 5,
@@ -31,5 +36,8 @@
   "logging": {
     "level": "info",
     "json": true
+  },
+  "ssm": {
+    "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
   }
 }

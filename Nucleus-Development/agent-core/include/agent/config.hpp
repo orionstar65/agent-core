@@ -9,6 +9,8 @@ struct Config {
     struct Backend {
         std::string base_url{"https://api.nucleus.example.tbd"};
         std::string auth_path{"/deviceservices/api/Authentication/devicecertificatevalid/"};
+        std::string is_registered_path{"/deviceservices/api/devicemanagement/isdeviceregistered/"};
+        std::string get_activation_path{"/deviceservices/api/devicemanagement/getactivationinformation/"};
     } backend;
 
     struct Identity {
@@ -50,6 +52,10 @@ struct Config {
         std::string level{"info"};
         bool json{true};
     } logging;
+
+    struct Ssm {
+        std::string agent_path;
+    } ssm;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);

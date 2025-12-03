@@ -67,8 +67,25 @@ else()
     target_link_libraries(test_zmq PRIVATE pthread)
 endif()
 
+# Integration test for SSM Registration
+add_executable(test_ssm_registration
+    integration/test_ssm_registration.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_ssm_registration PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_ssm_registration PRIVATE ws2_32)
+else()
+    target_link_libraries(test_ssm_registration PRIVATE pthread)
+endif()
+
 # Register tests with CTest and set working directory
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+# Note: SSM registration test requires sudo, so it's not added to CTest by default
+# Run manually with: sudo ./build/tests/test_ssm_registration --full
 
 message(STATUS "Integration tests configured")

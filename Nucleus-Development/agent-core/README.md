@@ -110,24 +110,50 @@ Agent Core authenticates with the backend using X.509 certificates:
 6. Network errors and 5xx errors are retried according to retry policy
 7. 4xx errors (client errors) are not retried
 
+### SSM Registration
+
+After successful authentication, Agent Core registers with AWS Systems Manager:
+
+1. **Check backend registration**: Calls `isdeviceregistered` API to check if backend thinks device is registered
+2. **Check local registration**: Verifies if SSM Agent service is running locally
+3. **Get activation info**: If not registered, calls `getactivationinformation` API to get activation credentials
+4. **Register with SSM**: Executes `amazon-ssm-agent -register` with the activation ID, code, and region
+5. **Restart SSM service**: Restarts the SSM Agent service to apply registration
+
+**Registration Flow:**
+- If both backend and local agree device is registered → Skip registration
+- If either says not registered → Get new activation info and register
+
+**SSM Agent Path Configuration:**
+- Linux (snap): `/snap/amazon-ssm-agent/current/amazon-ssm-agent`
+- Linux (apt): `/usr/bin/amazon-ssm-agent`
+- Windows: Path to `amazon-ssm-agent.exe`
+
+**Note:** SSM registration requires root/administrator privileges.
+
 **Example Configuration:**
 ```json
 {
   "backend": {
     "baseUrl": "https://35.159.104.91:443",
-    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/"
+    "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/",
+    "isRegisteredPath": "/deviceservices/api/devicemanagement/isdeviceregistered/",
+    "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/"
   },
   "identity": {
     "deviceSerial": "200000",
     "uuid": "a1635025-2723-4ffa-b608-208578d6128f"
   },
   "cert": {
-    "certPath": "../cert_base64(200000).txt"
+    "certPath": "./cert_base64(200000).txt"
   },
   "retry": {
     "maxAttempts": 5,
     "baseMs": 500,
     "maxMs": 8000
+  },
+  "ssm": {
+    "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
   }
 }
 ```
@@ -269,6 +295,7 @@ ctest --test-dir build --output-on-failure
 **Available Tests:**
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
+- `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
 
 ### ZeroMQ Integration Test
 
@@ -295,6 +322,36 @@ The test will:
 **Prerequisites:**
 - Sample extension must be built at `extensions/sample/build/sample-ext`
 - ZeroMQ must be installed and available
+
+### SSM Registration Integration Test
+
+The SSM registration integration test verifies the registration flow with AWS Systems Manager:
+
+```bash
+# Run tests that don't require sudo (backend checks, error handling)
+./build/tests/test_ssm_registration
+
+# Run all tests including full SSM registration (requires sudo)
+sudo ./build/tests/test_ssm_registration --full
+```
+
+The test will verify:
+1. Backend registration status check
+2. Local SSM agent status check
+3. Activation info retrieval from backend
+4. Error handling for invalid serial numbers, certificates, and backend URLs
+5. Empty activation info validation
+6. Full SSM registration flow (with `--full` flag)
+
+**Test Categories:**
+- **Without sudo**: Tests API communication, error handling, and validation logic
+- **With sudo**: Tests actual SSM agent registration (requires root privileges)
+
+**Prerequisites:**
+- Network connectivity to backend API
+- Valid certificate file at `cert_base64(200000).txt`
+- AWS SSM Agent installed (for full registration test)
+- Backend API accessible at configured URL
 
 ### Chaos Testing
 ```bash

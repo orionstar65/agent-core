@@ -30,6 +30,12 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             if (backend.contains("authPath")) {
                 config->backend.auth_path = backend["authPath"].get<std::string>();
             }
+            if (backend.contains("isRegisteredPath")) {
+                config->backend.is_registered_path = backend["isRegisteredPath"].get<std::string>();
+            }
+            if (backend.contains("getActivationPath")) {
+                config->backend.get_activation_path = backend["getActivationPath"].get<std::string>();
+            }
         }
         
         // Parse identity
@@ -118,6 +124,14 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             }
             if (logging.contains("json")) {
                 config->logging.json = logging["json"].get<bool>();
+            }
+        }
+        
+        // Parse SSM
+        if (j.contains("ssm")) {
+            auto& ssm = j["ssm"];
+            if (ssm.contains("agentPath")) {
+                config->ssm.agent_path = ssm["agentPath"].get<std::string>();
             }
         }
         
