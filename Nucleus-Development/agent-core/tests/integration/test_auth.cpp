@@ -3,15 +3,42 @@
 #include "agent/identity.hpp"
 #include <iostream>
 #include <cassert>
+#include <cstdlib>
+#include <unistd.h>
+#include <linux/limits.h>
 
 using namespace agent;
+
+// Get the absolute path to the agent-core directory
+std::string get_agent_core_dir() {
+    char exe_path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len != -1) {
+        exe_path[len] = '\0';
+        std::string path(exe_path);
+        // Test executable is at: agent-core/build/tests/test_ssm_registration
+        // We need to go up to agent-core directory
+        size_t pos = path.rfind("/build/tests/");
+        if (pos != std::string::npos) {
+            return path.substr(0, pos);
+        }
+    }
+    // Fallback: try to get current working directory and navigate up
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+        return std::string(cwd);
+    }
+    return ".";
+}
 
 // Test helper to create a test config
 Config create_test_config() {
     Config config;
+    std::string agent_core_dir = get_agent_core_dir();
+    
     config.backend.base_url = "https://35.159.104.91:443";
     config.backend.auth_path = "/deviceservices/api/Authentication/devicecertificatevalid/";
-    config.cert.cert_path = "../../cert_base64(200000).txt";
+    config.cert.cert_path = agent_core_dir + "/cert_base64(200000).txt";
     config.retry.max_attempts = 3;
     config.retry.base_ms = 500;
     config.retry.max_ms = 5000;
