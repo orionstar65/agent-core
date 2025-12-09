@@ -34,6 +34,7 @@ void log(const std::string& level, const std::string& message, const std::string
         std::cout << " " << details;
     }
     std::cout << "\n";
+    std::cout.flush();  // Ensure output is written immediately (important on Windows)
 }
 
 void signal_handler(int signum) {
@@ -54,7 +55,13 @@ int main(int argc, char* argv[]) {
     
     zmq::context_t context(1);
     zmq::socket_t rep_socket(context, ZMQ_REP);
+#ifdef _WIN32
+    // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+    std::string rep_endpoint = "tcp://127.0.0.1:5556";
+#else
+    // Linux: Use /tmp/ directory for IPC
     std::string rep_endpoint = "ipc:///tmp/agent-bus-req";
+#endif
     try {
         rep_socket.bind(rep_endpoint);
     } catch (const zmq::error_t& e) {

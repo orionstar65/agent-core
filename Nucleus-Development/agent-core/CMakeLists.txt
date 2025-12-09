@@ -18,12 +18,38 @@ message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID}")
 if(MSVC)
     add_compile_options(/W4)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    # Use static runtime to avoid requiring VCRUNTIME DLLs
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    
+    # NOTE: Windows builds use MSVC only (not MSYS2/MinGW)
+    # Defensive filtering below prevents accidental use of MSYS2/MinGW paths if installed on system
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Windows builds use MSVC only (via Visual Studio)
+# Defensive filtering: Exclude MSYS2/MinGW paths if accidentally present in environment
+if(MSVC)
+    # Remove MSYS2/MinGW paths from CMAKE_PREFIX_PATH (defensive, should not be needed)
+    if(CMAKE_PREFIX_PATH)
+        list(FILTER CMAKE_PREFIX_PATH EXCLUDE REGEX ".*[Mm][Ss][Yy][Ss].*")
+        list(FILTER CMAKE_PREFIX_PATH EXCLUDE REGEX ".*[Mm][Ii][Nn][Gg][Ww].*")
+    endif()
+    
+    # Environment variable cleaning is done in build-msvc.ps1 script
+    # This ensures MSYS2/MinGW paths are removed from PATH/INCLUDE before CMake runs
+endif()
+
 # Find required packages
+# For Windows MSVC builds, use vcpkg for dependencies (CURL, ZeroMQ)
+# Set CMAKE_TOOLCHAIN_FILE to vcpkg.cmake if using vcpkg
 find_package(CURL REQUIRED)
+
+# Defensive filtering: Exclude MSYS2/MinGW paths from CURL (should not be needed with vcpkg)
+if(MSVC AND CURL_INCLUDE_DIRS)
+    list(FILTER CURL_INCLUDE_DIRS EXCLUDE REGEX ".*[Mm][Ss][Yy][Ss].*")
+    list(FILTER CURL_INCLUDE_DIRS EXCLUDE REGEX ".*[Mm][Ii][Nn][Gg][Ww].*")
+endif()
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -50,6 +76,7 @@ set(AGENT_CORE_SOURCES
     src/res/resource_monitor.cpp
     src/util/retry.cpp
     src/util/uuid.cpp
+    src/util/path_utils.cpp
     src/telemetry/logging.cpp
     src/telemetry/metrics.cpp
 )
@@ -63,6 +90,25 @@ endif()
 
 # Main executable
 add_executable(agent-core ${AGENT_CORE_SOURCES})
+
+# Defensive filtering: Exclude MSYS2/MinGW include directories (should not be needed)
+if(MSVC)
+    # Get current include directories and filter out MSYS2/MinGW paths
+    get_target_property(currentIncludes agent-core INCLUDE_DIRECTORIES)
+    if(currentIncludes)
+        list(FILTER currentIncludes EXCLUDE REGEX ".*[Mm][Ss][Yy][Ss].*")
+        list(FILTER currentIncludes EXCLUDE REGEX ".*[Mm][Ii][Nn][Gg][Ww].*")
+        set_target_properties(agent-core PROPERTIES INCLUDE_DIRECTORIES "${currentIncludes}")
+    endif()
+    
+    # Also filter system include directories
+    get_target_property(currentSystemIncludes agent-core INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
+    if(currentSystemIncludes)
+        list(FILTER currentSystemIncludes EXCLUDE REGEX ".*[Mm][Ss][Yy][Ss].*")
+        list(FILTER currentSystemIncludes EXCLUDE REGEX ".*[Mm][Ii][Nn][Gg][Ww].*")
+        set_target_properties(agent-core PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${currentSystemIncludes}")
+    endif()
+endif()
 
 # Link libraries
 target_link_libraries(agent-core PRIVATE CURL::libcurl)

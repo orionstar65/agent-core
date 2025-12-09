@@ -25,7 +25,7 @@ void test_zmq_request_reply() {
     std::cout << "\n=== Test: ZeroMQ Request/Reply ===\n";
     
     auto logger = create_logger("info", false);
-    auto bus = create_zmq_bus(logger.get());
+    auto bus = create_zmq_bus(logger.get(), 5555, 5556);
     auto ext_manager = create_extension_manager();
     
     ExtensionSpec spec = create_test_extension_spec();
@@ -46,6 +46,10 @@ void test_zmq_request_reply() {
     Envelope reply;
     bus->request(req, reply);
     
+    // Wait for extension to finish logging the reply before stopping
+    // The extension logs 5 lines after sending the reply, so we need enough time
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    
     assert(reply.correlation_id == req.correlation_id && 
            "Correlation ID should match");
     assert(reply.topic == req.topic + ".reply" && 
@@ -59,7 +63,7 @@ void test_zmq_correlation_id_preservation() {
     std::cout << "\n=== Test: Correlation ID Preservation ===\n";
     
     auto logger = create_logger("info", false);
-    auto bus = create_zmq_bus(logger.get());
+    auto bus = create_zmq_bus(logger.get(), 5555, 5556);
     auto ext_manager = create_extension_manager();
     
     ExtensionSpec spec = create_test_extension_spec();
@@ -76,6 +80,10 @@ void test_zmq_correlation_id_preservation() {
     
     Envelope reply;
     bus->request(req, reply);
+    
+    // Wait for extension to finish logging the reply before stopping
+    // The extension logs 5 lines after sending the reply, so we need enough time
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     
     assert(reply.correlation_id == req.correlation_id && 
            "Correlation ID should be preserved");

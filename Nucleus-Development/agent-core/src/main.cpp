@@ -11,6 +11,12 @@
 #include "agent/resource_monitor.hpp"
 #include "agent/telemetry.hpp"
 #include "agent/retry.hpp"
+#ifdef _WIN32
+#include "agent/path_utils.hpp"
+#include <fstream>
+#include <filesystem>
+#include <windows.h>
+#endif
 
 #include <iostream>
 #include <memory>
@@ -42,7 +48,6 @@ public:
         // Create subsystems
         logger_ = create_logger("info", false);
         metrics_ = create_metrics();
-        
         log(LogLevel::Info, "Core", "Initializing Agent Core");
         
         // Load configuration
@@ -101,12 +106,13 @@ public:
         }
         
         // Initialize subsystems
-        bus_ = create_zmq_bus();
+        bus_ = create_zmq_bus(logger_.get(), config_->zmq.pub_port, config_->zmq.req_port);
         mqtt_client_ = create_mqtt_client();
         ext_manager_ = create_extension_manager();
         resource_monitor_ = create_resource_monitor();
         
         log(LogLevel::Info, "Core", "Initialization complete");
+        
         return true;
     }
     
@@ -261,11 +267,47 @@ private:
     }
 };
 
+#ifdef _WIN32
+// Global variables for service mode (accessible from service_host_win.cpp)
+std::string g_config_path;
+AgentCore* g_agent_instance = nullptr;
+
+// Function to run agent core (used by both console and service mode)
+void run_agent_core(ServiceHost& service_host, const std::string& config_path) {
+    AgentCore agent;
+    g_agent_instance = &agent;
+    
+    try {
+        if (!agent.initialize(config_path)) {
+            std::cerr << "Failed to initialize agent core\n";
+            throw std::runtime_error("Agent core initialization failed");
+        }
+        
+        // Run main loop directly
+        // In service mode, service_host.run() just stores the lambda and doesn't execute it
+        // So we need to run the agent loop directly here for both console and service mode
+        while (!service_host.should_stop()) {
+            agent.run(service_host);
+            // Small sleep to prevent tight loop
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        // Cleanup
+        agent.shutdown();
+    } catch (const std::exception& e) {
+        std::cerr << "Error in run_agent_core: " << e.what() << "\n";
+        agent.shutdown();
+        throw;  // Re-throw to be caught by ServiceMain
+    }
+    
+    g_agent_instance = nullptr;
+}
+#endif
+
 int main(int argc, char* argv[]) {
     std::string config_path = "config/dev.json";
     
     // Parse command line arguments
-    // TODO: will need to determine the command line arguments
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "--config" && i + 1 < argc) {
@@ -279,14 +321,34 @@ int main(int argc, char* argv[]) {
         }
     }
     
+#ifdef _WIN32
+    // On Windows, check if running as a service
+    // StartServiceCtrlDispatcher will connect to SCM if running as service
+    // and call ServiceMain, which will handle service initialization
+    g_config_path = config_path;
+    
+    // Try to start service dispatcher (only succeeds if running as service)
+    // This must be called before creating any service host instance
+    run_as_service();
+    
+    // If we get here, either:
+    // 1. Not running as service (StartServiceCtrlDispatcher failed)
+    // 2. Service stopped and returned
+    // Continue with console mode
+#endif
+    
     try {
-        // Create service host
+        // Create service host (console mode)
         auto service_host = create_service_host();
         if (!service_host->initialize()) {
             std::cerr << "Failed to initialize service host\n";
             return 1;
         }
         
+#ifdef _WIN32
+        // Run in console mode
+        run_agent_core(*service_host, config_path);
+#else
         // Create agent core
         AgentCore agent;
         if (!agent.initialize(config_path)) {
@@ -301,6 +363,8 @@ int main(int argc, char* argv[]) {
         
         // Cleanup
         agent.shutdown();
+#endif
+        
         service_host->shutdown();
         
         std::cout << "Agent Core exited cleanly\n";

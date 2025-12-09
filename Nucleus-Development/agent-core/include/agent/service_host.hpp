@@ -26,4 +26,9 @@ public:
 // Create platform-specific service host
 std::unique_ptr<ServiceHost> create_service_host();
 
+#ifdef _WIN32
+// Run as Windows Service (called from main when running as service)
+void run_as_service();
+#endif
+
 }

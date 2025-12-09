@@ -32,6 +32,8 @@ public:
 };
 
 // Create ZeroMQ-based bus implementation
-std::unique_ptr<Bus> create_zmq_bus(Logger* logger = nullptr);
+// pub_port: Port for PUB/SUB (publish/subscribe), default 5555
+// req_port: Port for REQ/REP (request/reply), default 5556
+std::unique_ptr<Bus> create_zmq_bus(Logger* logger = nullptr, int pub_port = 5555, int req_port = 5556);
 
 }

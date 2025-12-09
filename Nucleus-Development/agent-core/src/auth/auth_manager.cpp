@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 
 namespace agent {
 
@@ -137,9 +138,18 @@ private:
     std::unique_ptr<HttpsClient> https_client_;
     
     std::string read_certificate(const std::string& cert_path) {
-        std::ifstream file(cert_path);
+        // Verify path is not empty
+        if (cert_path.empty()) {
+            std::cerr << "AuthManager: ERROR - Certificate path is empty\n";
+            return "";
+        }
+        
+        // Open file directly - ifstream will fail gracefully if file doesn't exist
+        // This avoids potential issues with filesystem::exists() on paths with special characters
+        std::ifstream file(cert_path, std::ios::binary);
+        
         if (!file.is_open()) {
-            std::cerr << "Failed to open certificate file: " << cert_path << "\n";
+            std::cerr << "AuthManager: ERROR - Failed to open certificate file: " << cert_path << "\n";
             return "";
         }
         
@@ -147,9 +157,25 @@ private:
         buffer << file.rdbuf();
         std::string content = buffer.str();
         
-        // Trim whitespace
-        content.erase(0, content.find_first_not_of(" \t\r\n"));
-        content.erase(content.find_last_not_of(" \t\r\n") + 1);
+        // Trim whitespace - safely handle empty strings and npos
+        size_t first = content.find_first_not_of(" \t\r\n");
+        
+        if (first != std::string::npos) {
+            content.erase(0, first);
+        } else {
+            // String is all whitespace
+            content.clear();
+            return content;
+        }
+        
+        size_t last = content.find_last_not_of(" \t\r\n");
+        
+        if (last != std::string::npos) {
+            content.erase(last + 1);
+        } else {
+            // Should not happen after first trim, but be safe
+            content.clear();
+        }
         
         return content;
     }

@@ -103,9 +103,10 @@ private:
 #else
         localtime_r(&now, &tm);
 #endif
-        std::ostringstream oss;
-        oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S");
-        return oss.str();
+        // Use strftime for better MSVC compatibility
+        char buffer[32];
+        std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &tm);
+        return std::string(buffer);
     }
 };
 

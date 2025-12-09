@@ -1,8 +1,10 @@
 #include "agent/config.hpp"
+#include "agent/path_utils.hpp"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <filesystem>
 
 using json = nlohmann::json;
 
@@ -81,7 +83,64 @@ std::unique_ptr<Config> load_config(const std::string& path) {
                 config->cert.store_hint = cert["storeHint"].get<std::string>();
             }
             if (cert.contains("certPath")) {
-                config->cert.cert_path = cert["certPath"].get<std::string>();
+                std::string cert_path = cert["certPath"].get<std::string>();
+                
+                // Resolve cert path relative to executable directory
+                // This ensures relative paths like ./cert_base64(200000).txt work correctly
+                // when running as Windows service (which runs from C:\Windows\System32)
+                if (!cert_path.empty()) {
+                    std::filesystem::path cert_path_obj(cert_path);
+                    
+                    // Check if path is absolute (Windows: starts with drive letter or \\, Linux: starts with /)
+                    bool is_absolute = cert_path_obj.is_absolute();
+                    
+                    if (!is_absolute) {
+                        // Get executable directory
+                        std::string exe_dir = util::get_executable_directory();
+                        
+                        if (!exe_dir.empty()) {
+                            // Combine executable directory with cert path
+                            // Since exe_dir is absolute, the result will be absolute
+                            std::filesystem::path cert_full_path = std::filesystem::path(exe_dir) / cert_path;
+                            
+                            // Normalize the path (resolves .. and . components)
+                            cert_full_path = cert_full_path.lexically_normal();
+                            
+                            // Convert to absolute path to ensure it's fully resolved
+                            try {
+                                std::filesystem::path abs_cert_path = std::filesystem::absolute(cert_full_path);
+                                config->cert.cert_path = abs_cert_path.lexically_normal().string();
+                            } catch (...) {
+                                // If absolute() fails, use the normalized path as-is
+                                config->cert.cert_path = cert_full_path.string();
+                            }
+                        } else {
+                            // If we can't get executable directory, fall back to resolving relative to current working directory
+                            std::string resolved = util::resolve_path(cert_path);
+                            if (!resolved.empty()) {
+                                config->cert.cert_path = resolved;
+                            } else {
+                                config->cert.cert_path = cert_path;
+                            }
+                        }
+                    } else {
+                        // Path is already absolute, use resolve_path to get canonical form
+                        std::string resolved = util::resolve_path(cert_path);
+                        if (!resolved.empty()) {
+                            config->cert.cert_path = resolved;
+                        } else {
+                            // If resolve_path fails, normalize and use as-is
+                            try {
+                                std::filesystem::path norm_path = std::filesystem::path(cert_path).lexically_normal();
+                                config->cert.cert_path = norm_path.string();
+                            } catch (...) {
+                                config->cert.cert_path = cert_path;
+                            }
+                        }
+                    }
+                } else {
+                    config->cert.cert_path = cert_path;
+                }
             }
             if (cert.contains("renewDays")) {
                 config->cert.renew_days = cert["renewDays"].get<int>();
@@ -132,6 +191,17 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             auto& ssm = j["ssm"];
             if (ssm.contains("agentPath")) {
                 config->ssm.agent_path = ssm["agentPath"].get<std::string>();
+            }
+        }
+        
+        // Parse ZeroMQ
+        if (j.contains("zmq")) {
+            auto& zmq = j["zmq"];
+            if (zmq.contains("pubPort")) {
+                config->zmq.pub_port = zmq["pubPort"].get<int>();
+            }
+            if (zmq.contains("reqPort")) {
+                config->zmq.req_port = zmq["reqPort"].get<int>();
             }
         }
         

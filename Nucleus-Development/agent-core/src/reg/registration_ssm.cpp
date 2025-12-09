@@ -210,17 +210,106 @@ public:
         }
         
 #ifdef _WIN32
-        std::string cmd = "\"" + ssm_agent_path_ + "\" -register ";
-        cmd += "-code \"" + info.activation_code + "\" ";
-        cmd += "-id \"" + info.activation_id + "\" ";
-        cmd += "-region \"" + info.region + "\"";
+        // Use CreateProcess instead of system() to properly handle arguments with special characters
+        std::string agent_path = ssm_agent_path_.empty() ? "amazon-ssm-agent.exe" : ssm_agent_path_;
         
         std::cout << "  - Executing: amazon-ssm-agent.exe -register -code [REDACTED] -id " 
                   << info.activation_id << " -region " << info.region << "\n";
         
-        int result = system(cmd.c_str());
-        if (result != 0) {
-            std::cerr << "Registration: SSM registration command failed with code: " << result << "\n";
+        // Build command line with proper quoting for arguments that may contain special characters
+        std::string cmd_line;
+        
+        // Quote the executable path if it contains spaces
+        if (!agent_path.empty() && (agent_path.find(' ') != std::string::npos || agent_path.find('\t') != std::string::npos)) {
+            cmd_line = "\"" + agent_path + "\"";
+        } else {
+            cmd_line = agent_path;
+        }
+        
+        // Add arguments with proper quoting
+        // Always quote values to handle special characters safely
+        cmd_line += " -register";
+        
+        // Quote activation code (always quote to handle special characters)
+        cmd_line += " -code \"";
+        // Escape any quotes in the activation code by doubling them (Windows command line escaping)
+        std::string escaped_code = info.activation_code;
+        size_t pos = 0;
+        while ((pos = escaped_code.find('"', pos)) != std::string::npos) {
+            escaped_code.insert(pos, "\"");
+            pos += 2;
+        }
+        cmd_line += escaped_code + "\"";
+        
+        // Quote activation ID
+        cmd_line += " -id \"";
+        std::string escaped_id = info.activation_id;
+        pos = 0;
+        while ((pos = escaped_id.find('"', pos)) != std::string::npos) {
+            escaped_id.insert(pos, "\"");
+            pos += 2;
+        }
+        cmd_line += escaped_id + "\"";
+        
+        // Quote region
+        cmd_line += " -region \"";
+        std::string escaped_region = info.region;
+        pos = 0;
+        while ((pos = escaped_region.find('"', pos)) != std::string::npos) {
+            escaped_region.insert(pos, "\"");
+            pos += 2;
+        }
+        cmd_line += escaped_region + "\"";
+        
+        // CreateProcessA requires non-const buffer (it may modify it)
+        std::vector<char> cmd_line_buf(cmd_line.begin(), cmd_line.end());
+        cmd_line_buf.push_back('\0');
+        
+        STARTUPINFOA si = {0};
+        PROCESS_INFORMATION pi = {0};
+        si.cb = sizeof(si);
+        // Don't set std handles for service - services don't have console
+        // This can cause issues when trying to inherit invalid handles
+        
+        // Don't inherit handles when running as service (can cause issues)
+        BOOL success = CreateProcessA(
+            nullptr,                    // Application name (use command line instead)
+            cmd_line_buf.data(),        // Command line (non-const buffer)
+            nullptr,                    // Process security attributes
+            nullptr,                    // Thread security attributes
+            FALSE,                       // Don't inherit handles (safer for services)
+            CREATE_NO_WINDOW,           // Don't create console window
+            nullptr,                    // Environment (inherit from parent)
+            nullptr,                    // Current directory (inherit from parent)
+            &si,                        // Startup info
+            &pi                         // Process information
+        );
+        
+        if (!success) {
+            DWORD error = GetLastError();
+            std::cerr << "Registration: Failed to create SSM registration process (error: " << error << ")\n";
+            return RegistrationState::Failed;
+        }
+        
+        // Wait for the process to complete (with timeout)
+        DWORD wait_result = WaitForSingleObject(pi.hProcess, 60000); // 60 second timeout
+        DWORD exit_code = 1;
+        
+        if (wait_result == WAIT_OBJECT_0) {
+            GetExitCodeProcess(pi.hProcess, &exit_code);
+        } else if (wait_result == WAIT_TIMEOUT) {
+            std::cerr << "Registration: SSM registration process timed out\n";
+            TerminateProcess(pi.hProcess, 1);
+            exit_code = 1;
+        } else {
+            std::cerr << "Registration: Failed to wait for SSM registration process (error: " << GetLastError() << ")\n";
+        }
+        
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        
+        if (exit_code != 0) {
+            std::cerr << "Registration: SSM registration command failed with exit code: " << exit_code << "\n";
             return RegistrationState::Failed;
         }
 #else

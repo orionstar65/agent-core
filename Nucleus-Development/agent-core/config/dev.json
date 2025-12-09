@@ -39,5 +39,9 @@
   },
   "ssm": {
     "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
+  },
+  "zmq": {
+    "pubPort": 5555,
+    "reqPort": 5556
   }
 }

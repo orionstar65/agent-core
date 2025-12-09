@@ -32,8 +32,8 @@ public:
     // Stop all running extensions
     virtual void stop_all() = 0;
     
-    // Get status of all extensions
-    virtual std::map<std::string, ExtState> status() const = 0;
+    // Get status of all extensions (may update internal state based on process status)
+    virtual std::map<std::string, ExtState> status() = 0;
 };
 
 // Create default implementation

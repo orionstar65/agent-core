@@ -39,14 +39,22 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 
 ### Prerequisites
 - CMake 3.15 or higher
-- C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
-- libcurl (for HTTPS communication)
-- nlohmann/json (for JSON parsing)
-- ZeroMQ (libzmq + cppzmq for extension IPC)
+- C++17 compatible compiler:
+  - **Windows**: MSVC 2017+ (Visual Studio 2022 recommended) - use `scripts/build-msvc.ps1`
+  - **Linux**: GCC 7+ or Clang 5+
+- Dependencies:
+  - **Windows**: Managed via vcpkg (included with Visual Studio)
+  - **Linux**: libcurl, nlohmann/json, ZeroMQ
 
 **Install on Ubuntu/Debian:**
 ```bash
 sudo apt-get install -y build-essential cmake libcurl4-openssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev
+```
+
+**Windows Build:**
+```powershell
+# Use the MSVC build script (requires Visual Studio 2022)
+.\scripts\build-msvc.ps1
 ```
 
 ### Quick Start

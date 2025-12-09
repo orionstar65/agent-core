@@ -17,12 +17,18 @@ namespace agent {
 
 class ZmqBusImpl : public Bus {
 public:
-    ZmqBusImpl(Logger* logger) : logger_(logger) {
+    ZmqBusImpl(Logger* logger, int pub_port, int req_port) : logger_(logger), pub_port_(pub_port), req_port_(req_port) {
 #ifdef HAVE_ZMQ
         context_ = std::make_unique<zmq::context_t>(1);
         
         pub_socket_ = std::make_unique<zmq::socket_t>(*context_, ZMQ_PUB);
+#ifdef _WIN32
+        // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+        std::string pub_endpoint = "tcp://127.0.0.1:" + std::to_string(pub_port_);
+#else
+        // Linux: Use /tmp/ directory for IPC
         std::string pub_endpoint = "ipc:///tmp/agent-bus-pub";
+#endif
         try {
             pub_socket_->bind(pub_endpoint);
         } catch (const zmq::error_t& e) {
@@ -34,7 +40,13 @@ public:
         }
         
         req_socket_ = std::make_unique<zmq::socket_t>(*context_, ZMQ_REQ);
+#ifdef _WIN32
+        // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+        std::string req_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port_);
+#else
+        // Linux: Use /tmp/ directory for IPC
         std::string req_endpoint = "ipc:///tmp/agent-bus-req";
+#endif
         try {
             req_socket_->connect(req_endpoint);
         } catch (const zmq::error_t& e) {
@@ -150,7 +162,13 @@ public:
         
         sub_thread_ = std::thread([this, topic]() {
             zmq::socket_t sub_socket(*context_, ZMQ_SUB);
+#ifdef _WIN32
+            // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+            std::string sub_endpoint = "tcp://127.0.0.1:" + std::to_string(pub_port_);
+#else
+            // Linux: Use /tmp/ directory for IPC
             std::string sub_endpoint = "ipc:///tmp/agent-bus-pub";
+#endif
             try {
                 sub_socket.connect(sub_endpoint);
             } catch (const zmq::error_t& e) {
@@ -213,6 +231,8 @@ public:
 
 private:
     Logger* logger_;
+    int pub_port_;
+    int req_port_;
 #ifdef HAVE_ZMQ
     std::unique_ptr<zmq::context_t> context_;
     std::unique_ptr<zmq::socket_t> pub_socket_;
@@ -226,8 +246,8 @@ private:
 #endif
 };
 
-std::unique_ptr<Bus> create_zmq_bus(Logger* logger) {
-    return std::make_unique<ZmqBusImpl>(logger);
+std::unique_ptr<Bus> create_zmq_bus(Logger* logger, int pub_port, int req_port) {
+    return std::make_unique<ZmqBusImpl>(logger, pub_port, req_port);
 }
 
 }

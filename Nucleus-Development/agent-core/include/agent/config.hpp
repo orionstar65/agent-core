@@ -56,6 +56,11 @@ struct Config {
     struct Ssm {
         std::string agent_path;
     } ssm;
+    
+    struct ZeroMQ {
+        int pub_port{5555};  // Port for PUB/SUB (publish/subscribe)
+        int req_port{5556};  // Port for REQ/REP (request/reply)
+    } zmq;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);
