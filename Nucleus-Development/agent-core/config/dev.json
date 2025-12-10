@@ -42,6 +42,10 @@
   },
   "zmq": {
     "pubPort": 5555,
-    "reqPort": 5556
+    "reqPort": 5556,
+    "curveEnabled": false,
+    "curveServerKey": "",
+    "curvePublicKey": "",
+    "curveSecretKey": ""
   }
 }

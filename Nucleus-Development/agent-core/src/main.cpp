@@ -106,7 +106,7 @@ public:
         }
         
         // Initialize subsystems
-        bus_ = create_zmq_bus(logger_.get(), config_->zmq.pub_port, config_->zmq.req_port);
+        bus_ = create_zmq_bus(logger_.get(), config_->zmq);
         mqtt_client_ = create_mqtt_client();
         ext_manager_ = create_extension_manager();
         resource_monitor_ = create_resource_monitor();

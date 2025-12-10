@@ -203,6 +203,18 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             if (zmq.contains("reqPort")) {
                 config->zmq.req_port = zmq["reqPort"].get<int>();
             }
+            if (zmq.contains("curveEnabled")) {
+                config->zmq.curve_enabled = zmq["curveEnabled"].get<bool>();
+            }
+            if (zmq.contains("curveServerKey")) {
+                config->zmq.curve_server_key = zmq["curveServerKey"].get<std::string>();
+            }
+            if (zmq.contains("curvePublicKey")) {
+                config->zmq.curve_public_key = zmq["curvePublicKey"].get<std::string>();
+            }
+            if (zmq.contains("curveSecretKey")) {
+                config->zmq.curve_secret_key = zmq["curveSecretKey"].get<std::string>();
+            }
         }
         
         std::cout << "Config loaded successfully from: " << path << "\n";

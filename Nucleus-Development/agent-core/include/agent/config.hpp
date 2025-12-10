@@ -60,6 +60,10 @@ struct Config {
     struct ZeroMQ {
         int pub_port{5555};  // Port for PUB/SUB (publish/subscribe)
         int req_port{5556};  // Port for REQ/REP (request/reply)
+        bool curve_enabled{false};  // Enable CURVE encryption for inter-process (TCP) connections
+        std::string curve_server_key;  // Server public key (40 chars base64)
+        std::string curve_public_key;  // Client public key (40 chars base64)
+        std::string curve_secret_key;  // Client secret key (40 chars base64)
     } zmq;
 };
 

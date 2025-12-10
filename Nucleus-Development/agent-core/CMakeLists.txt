@@ -57,8 +57,12 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 # Add cmake modules to path
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-# Find ZeroMQ
+# Find ZeroMQ - try CONFIG mode first (for vcpkg), fallback to FindZeroMQ
+find_package(ZeroMQ CONFIG QUIET)
+set(ZMQ_FOUND_VIA_CONFIG ${ZeroMQ_FOUND})
+if(NOT ZeroMQ_FOUND)
 include(FindZeroMQ)
+endif()
 
 # Source files
 set(AGENT_CORE_SOURCES
@@ -120,8 +124,19 @@ else()
     target_link_libraries(agent-core PRIVATE pthread)
 endif()
 
-# ZeroMQ
-if(ZMQ_FOUND)
+# ZeroMQ and cppzmq
+if(ZMQ_FOUND_VIA_CONFIG)
+    # Using vcpkg ZeroMQ (CONFIG mode)
+    find_package(ZeroMQ CONFIG REQUIRED)
+    target_link_libraries(agent-core PRIVATE libzmq)
+    target_compile_definitions(agent-core PRIVATE HAVE_ZMQ)
+    
+    # cppzmq is header-only, just add include directory
+    # vcpkg installs it in vcpkg_installed/x64-windows/include
+    get_filename_component(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed" ABSOLUTE)
+    target_include_directories(agent-core PRIVATE "${VCPKG_INSTALLED_DIR}/x64-windows/include")
+elseif(ZMQ_FOUND)
+    # Using FindZeroMQ.cmake (fallback)
     target_include_directories(agent-core PRIVATE ${ZMQ_INCLUDE_DIRS})
     target_link_libraries(agent-core PRIVATE ${ZMQ_LIBRARIES})
     target_compile_definitions(agent-core PRIVATE HAVE_ZMQ)
