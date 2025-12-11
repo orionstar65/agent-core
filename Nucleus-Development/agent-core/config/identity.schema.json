@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Identity Configuration Schema",
+  "description": "Schema for identity.json file used for device/gateway identity discovery",
+  "type": "object",
+  "properties": {
+    "serialNumber": {
+      "type": "string",
+      "description": "Device serial number"
+    },
+    "materialNumber": {
+      "type": "string",
+      "description": "Optional material number"
+    },
+    "productName": {
+      "type": "string",
+      "description": "Optional product name"
+    },
+    "softwareVersion": {
+      "type": "string",
+      "description": "Optional software version"
+    },
+    "tunnelInfo": {
+      "type": "object",
+      "description": "Tunnel configuration information",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether tunnel is enabled",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "isGateway": {
+      "type": "boolean",
+      "description": "Whether this is a gateway device (provisional). If true and no standard identity fields are present, a unique identifier (UUID) will be used.",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}
+

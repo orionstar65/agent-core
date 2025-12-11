@@ -1,0 +1,40 @@
+{
+  "_comment": "Example identity.json file for Agent Core identity discovery",
+  "_description": "This file is used as a fallback when Windows Registry is not available or does not contain identity information. Place this file in the same directory as the executable or in the current working directory.",
+  
+  "_example_device": {
+    "serialNumber": "DEV-12345-ABCDE",
+    "materialNumber": "MAT-98765",
+    "productName": "Agent Device v2",
+    "softwareVersion": "1.2.3",
+    "tunnelInfo": {
+      "enabled": false
+    },
+    "isGateway": false
+  },
+  
+  "_example_gateway": {
+    "serialNumber": "GW-67890-FGHIJ",
+    "materialNumber": "MAT-54321",
+    "productName": "Agent Gateway Pro",
+    "softwareVersion": "2.0.1",
+    "tunnelInfo": {
+      "enabled": true
+    },
+    "isGateway": true
+  },
+  
+  "_example_gateway_minimal": {
+    "_comment": "Gateway mode with minimal fields - UUID will be used as unique identifier",
+    "tunnelInfo": {
+      "enabled": true
+    },
+    "isGateway": true
+  },
+  
+  "_example_minimal": {
+    "_comment": "Minimal device configuration",
+    "serialNumber": "DEV-MINIMAL-001"
+  }
+}
+
