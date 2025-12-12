@@ -1,4 +1,4 @@
-# Integration tests
+# Unit and Integration tests
 
 # Add cmake modules to path for ZeroMQ detection
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
@@ -17,6 +17,8 @@ set(AGENT_LIB_SOURCES
     ../src/bus/envelope_serialization.cpp
     ../src/ext/extension_manager.cpp
     ../src/res/resource_monitor.cpp
+    ../src/service/restart_manager.cpp
+    ../src/service/restart_state_store.cpp
     ../src/util/retry.cpp
     ../src/util/uuid.cpp
     ../src/telemetry/logging.cpp
@@ -25,9 +27,15 @@ set(AGENT_LIB_SOURCES
 
 # Platform-specific sources
 if(WIN32)
-    list(APPEND AGENT_LIB_SOURCES ../src/service/service_host_win.cpp)
+    list(APPEND AGENT_LIB_SOURCES 
+        ../src/service/service_host_win.cpp
+        ../src/service/service_installer_win.cpp
+    )
 else()
-    list(APPEND AGENT_LIB_SOURCES ../src/service/service_host_linux.cpp)
+    list(APPEND AGENT_LIB_SOURCES 
+        ../src/service/service_host_linux.cpp
+        ../src/service/service_installer_linux.cpp
+    )
 endif()
 
 # Integration test for authentication
@@ -82,10 +90,59 @@ else()
     target_link_libraries(test_ssm_registration PRIVATE pthread)
 endif()
 
+# Unit test for RestartManager
+add_executable(test_restart_manager
+    unit/test_restart_manager.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_restart_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_restart_manager PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_restart_manager PRIVATE ws2_32)
+else()
+    target_link_libraries(test_restart_manager PRIVATE pthread)
+endif()
+
+# Integration test for Restart/Quarantine
+add_executable(test_restart_quarantine
+    integration/test_restart_quarantine.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_restart_quarantine PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_restart_quarantine PRIVATE ws2_32)
+else()
+    target_link_libraries(test_restart_quarantine PRIVATE pthread)
+endif()
+
+# Integration test for Service Installer
+add_executable(test_service_installer
+    integration/test_service_installer.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_service_installer PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_service_installer PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_service_installer PRIVATE ws2_32)
+else()
+    target_link_libraries(test_service_installer PRIVATE pthread)
+endif()
+
 # Register tests with CTest and set working directory
+add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME RestartQuarantineIntegrationTest COMMAND test_restart_quarantine WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-# Note: SSM registration test requires sudo, so it's not added to CTest by default
+add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+# Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full
+# Run manually with: sudo ./build/tests/test_service_installer --full
 
-message(STATUS "Integration tests configured")
+message(STATUS "Unit and integration tests configured")

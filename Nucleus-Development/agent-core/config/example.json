@@ -39,5 +39,12 @@
   },
   "ssm": {
     "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
+  },
+  "service": {
+    "maxRestartAttempts": 5,
+    "restartBaseDelayMs": 1000,
+    "restartMaxDelayMs": 300000,
+    "restartJitterFactor": 0.2,
+    "quarantineDurationS": 3600
   }
 }

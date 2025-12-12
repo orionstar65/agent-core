@@ -31,4 +31,11 @@ public:
 // Create retry policy with exponential backoff and jitter
 std::unique_ptr<RetryPolicy> create_retry_policy(const Config::Retry& config);
 
+// Utility function: Calculate exponential backoff with jitter
+// attempt: 0-based attempt number (0 = first attempt, no delay)
+// base_ms: base delay in milliseconds
+// max_ms: maximum delay cap in milliseconds  
+// jitter_pct: jitter percentage (e.g., 20 for ±20%)
+int calculate_backoff_with_jitter(int attempt, int base_ms, int max_ms, int jitter_pct = 20);
+
 }

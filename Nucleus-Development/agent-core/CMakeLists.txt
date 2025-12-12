@@ -48,6 +48,8 @@ set(AGENT_CORE_SOURCES
     src/bus/envelope_serialization.cpp
     src/ext/extension_manager.cpp
     src/res/resource_monitor.cpp
+    src/service/restart_manager.cpp
+    src/service/restart_state_store.cpp
     src/util/retry.cpp
     src/util/uuid.cpp
     src/telemetry/logging.cpp
@@ -56,9 +58,15 @@ set(AGENT_CORE_SOURCES
 
 # Platform-specific sources
 if(WIN32)
-    list(APPEND AGENT_CORE_SOURCES src/service/service_host_win.cpp)
+    list(APPEND AGENT_CORE_SOURCES 
+        src/service/service_host_win.cpp
+        src/service/service_installer_win.cpp
+    )
 else()
-    list(APPEND AGENT_CORE_SOURCES src/service/service_host_linux.cpp)
+    list(APPEND AGENT_CORE_SOURCES 
+        src/service/service_host_linux.cpp
+        src/service/service_installer_linux.cpp
+    )
 endif()
 
 # Main executable

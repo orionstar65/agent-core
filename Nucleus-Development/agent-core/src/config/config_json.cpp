@@ -135,6 +135,26 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             }
         }
         
+        // Parse Service
+        if (j.contains("service")) {
+            auto& service = j["service"];
+            if (service.contains("maxRestartAttempts")) {
+                config->service.max_restart_attempts = service["maxRestartAttempts"].get<int>();
+            }
+            if (service.contains("restartBaseDelayMs")) {
+                config->service.restart_base_delay_ms = service["restartBaseDelayMs"].get<int>();
+            }
+            if (service.contains("restartMaxDelayMs")) {
+                config->service.restart_max_delay_ms = service["restartMaxDelayMs"].get<int>();
+            }
+            if (service.contains("restartJitterFactor")) {
+                config->service.restart_jitter_factor = service["restartJitterFactor"].get<double>();
+            }
+            if (service.contains("quarantineDurationS")) {
+                config->service.quarantine_duration_s = service["quarantineDurationS"].get<int>();
+            }
+        }
+        
         std::cout << "Config loaded successfully from: " << path << "\n";
         std::cout << "  Backend URL: " << config->backend.base_url << "\n";
         std::cout << "  Device Serial: " << config->identity.device_serial << "\n";

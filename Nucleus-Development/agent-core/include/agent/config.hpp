@@ -56,6 +56,14 @@ struct Config {
     struct Ssm {
         std::string agent_path;
     } ssm;
+
+    struct Service {
+        int max_restart_attempts{5};
+        int restart_base_delay_ms{1000};
+        int restart_max_delay_ms{300000};  // 5 minutes
+        double restart_jitter_factor{0.2};  // 20% jitter
+        int quarantine_duration_s{3600};    // 1 hour
+    } service;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);

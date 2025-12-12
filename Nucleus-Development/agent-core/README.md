@@ -158,19 +158,77 @@ After successful authentication, Agent Core registers with AWS Systems Manager:
 }
 ```
 
-### As a Service
+### Service Manager
 
-**Linux (systemd):**
+Agent Core automatically installs and manages itself as an OS service:
+
+1. **Check if installed**: On startup, checks if systemd/Windows service is installed
+2. **Self-install**: If not installed, installs itself as a service automatically
+3. **Start service**: Starts the service and exits the installer process
+4. **Restart management**: Handles catastrophic failures with exponential backoff and quarantine
+5. **Graceful shutdown**: Responds to SIGTERM/SIGINT, stops extensions cleanly
+
+**Installation Flow:**
+- First run detects service is not installed
+- Copies binary to system location (`/usr/local/bin` on Linux)
+- Creates service definition (systemd unit or Windows SCM service)
+- Enables service to start on boot
+- Starts service immediately
+- Installer process exits (service continues running)
+
+**Restart and Quarantine:**
+- Process crashes trigger OS-level restart (systemd `Restart=on-failure`)
+- Agent loads restart state from `/var/lib/agent-core/restart-state.json`
+- Applies exponential backoff delay before initialization
+- Tracks restart count across crashes
+- After max attempts (default: 5), enters quarantine for 1 hour
+- Successful stable runtime (5 minutes) resets restart counter
+
+**Note:** Installation requires root/administrator privileges.
+
+**Install (First Run):**
 ```bash
-sudo cp packaging/linux/agent-core.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable agent-core
-sudo systemctl start agent-core
+# Linux
+sudo ./agent-core --config /path/to/config.json
+
+# Windows (Command Prompt as Administrator)
+agent-core.exe --config C:\path\to\config.json
 ```
 
-**Windows (SCM):**
-```powershell
-# See packaging/windows/agent-core.service.ps1
+**Start:**
+```bash
+# Linux
+sudo systemctl start agent-core
+
+# Windows
+sc start AgentCore
+```
+
+**Stop:**
+```bash
+# Linux
+sudo systemctl stop agent-core
+
+# Windows
+sc stop AgentCore
+```
+
+**Restart:**
+```bash
+# Linux
+sudo systemctl restart agent-core
+
+# Windows
+sc stop AgentCore && sc start AgentCore
+```
+
+**View Logs:**
+```bash
+# Linux
+sudo journalctl -u agent-core -f
+
+# Windows (Event Viewer)
+eventvwr.msc
 ```
 
 ## Extensions

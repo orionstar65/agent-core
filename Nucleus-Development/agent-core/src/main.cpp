@@ -11,12 +11,18 @@
 #include "agent/resource_monitor.hpp"
 #include "agent/telemetry.hpp"
 #include "agent/retry.hpp"
+#include "agent/restart_manager.hpp"
+#include "agent/restart_state_store.hpp"
+#include "agent/service_installer.hpp"
 
 #include <iostream>
 #include <memory>
 #include <thread>
 #include <chrono>
 #include <map>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 using namespace agent;
 
@@ -34,7 +40,7 @@ enum class AgentState {
 
 class AgentCore {
 public:
-    AgentCore() : current_state_(AgentState::INIT) {}
+    AgentCore() : current_state_(AgentState::INIT), start_time_(std::chrono::steady_clock::now()) {}
     
     bool initialize(const std::string& config_path) {
         std::cout << "\n=== Agent Core v" << VERSION << " ===\n\n";
@@ -110,7 +116,7 @@ public:
         return true;
     }
     
-    void run(ServiceHost& service_host) {
+    void run(ServiceHost& service_host, RestartManager* restart_mgr, RestartStateStore* restart_store) {
         // MQTT Connection
         current_state_ = AgentState::MQTT_CONNECT;
         log(LogLevel::Info, "Core", "Connecting to MQTT broker");
@@ -128,9 +134,7 @@ public:
             });
         
         // launch extensions (if any configured)
-        // for now launch a dummy extension spec
         std::vector<ExtensionSpec> ext_specs;
-        // this is an example: ext_specs.push_back({"sample-ext", "./sample-ext", {}, false});
         
         if (!ext_specs.empty()) {
             ext_manager_->launch(ext_specs);
@@ -140,8 +144,25 @@ public:
         current_state_ = AgentState::RUNLOOP;
         log(LogLevel::Info, "Core", "Entering main run loop");
         
+        const int stable_runtime_s = 300;
+        bool restart_counter_reset = false;
+        
         int loop_count = 0;
         while (!service_host.should_stop()) {
+            // Check if stable runtime reached and reset restart counter
+            if (!restart_counter_reset && restart_mgr) {
+                auto runtime = std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::steady_clock::now() - start_time_).count();
+                if (runtime >= stable_runtime_s) {
+                    restart_mgr->reset();
+                    if (restart_store) {
+                        auto persisted = restart_mgr->to_persisted();
+                        restart_store->save(persisted);
+                    }
+                    restart_counter_reset = true;
+                }
+            }
+            
             // Heartbeat
             if (loop_count % 10 == 0) {
                 send_heartbeat();
@@ -158,7 +179,6 @@ public:
             }
             
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            // TODO: Need to determine the number of seconds between checks
             loop_count++;
         }
         
@@ -185,6 +205,7 @@ public:
 
 private:
     AgentState current_state_;
+    std::chrono::steady_clock::time_point start_time_;
     
     std::unique_ptr<Config> config_;
     Identity identity_;
@@ -263,23 +284,118 @@ private:
 
 int main(int argc, char* argv[]) {
     std::string config_path = "config/dev.json";
+    std::string state_dir = "/var/lib/agent-core";
     
     // Parse command line arguments
-    // TODO: will need to determine the command line arguments
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "--config" && i + 1 < argc) {
             config_path = argv[++i];
+        } else if (arg == "--state-dir" && i + 1 < argc) {
+            state_dir = argv[++i];
         } else if (arg == "--help") {
             std::cout << "Usage: " << argv[0] << " [options]\n"
                       << "Options:\n"
-                      << "  --config PATH    Configuration file path (default: config/dev.json)\n"
-                      << "  --help           Show this help message\n";
+                      << "  --config PATH      Configuration file path (default: config/dev.json)\n"
+                      << "  --state-dir PATH   State directory (default: /var/lib/agent-core)\n"
+                      << "  --help             Show this help message\n";
             return 0;
         }
     }
     
     try {
+        // Check if service is installed, if not, install it
+        auto installer = create_service_installer();
+        auto status = installer->check_status();
+        
+        if (status == ServiceInstallStatus::NotInstalled) {
+            std::cout << "Agent Core: Service not installed, installing...\n";
+            
+            // Get current binary path
+            char binary_path[1024];
+#ifdef _WIN32
+            GetModuleFileName(nullptr, binary_path, sizeof(binary_path));
+#else
+            ssize_t len = readlink("/proc/self/exe", binary_path, sizeof(binary_path) - 1);
+            if (len != -1) {
+                binary_path[len] = '\0';
+            } else {
+                std::cerr << "Failed to get binary path\n";
+                return 1;
+            }
+#endif
+            
+            if (!installer->install(binary_path, config_path)) {
+                std::cerr << "Failed to install service\n";
+                return 1;
+            }
+            
+            std::cout << "Agent Core: Service installed successfully\n";
+            std::cout << "Agent Core: Starting service...\n";
+            
+            if (!installer->start()) {
+                std::cerr << "Failed to start service\n";
+                return 1;
+            }
+            
+            std::cout << "Agent Core: Service started successfully\n";
+            std::cout << "Agent Core: Exiting installer process\n";
+            return 0;
+        }
+        
+        // Load configuration first for restart policy
+        auto config = load_config(config_path);
+        if (!config) {
+            std::cerr << "Failed to load configuration\n";
+            return 1;
+        }
+        
+        // Ensure state directory exists
+#ifdef _WIN32
+        if (_mkdir(state_dir.c_str()) != 0 && errno != EEXIST) {
+#else
+        if (mkdir(state_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+#endif
+            std::cerr << "Failed to create state directory: " << state_dir << "\n";
+            return 1;
+        }
+        
+        // Handle restart management (catastrophic failure detection)
+        std::string state_file = state_dir + "/restart-state.json";
+        auto restart_store = create_restart_state_store(state_file);
+        auto restart_mgr = create_restart_manager();
+        
+        // Load restart state from disk
+        PersistedRestartState persisted_state;
+        if (restart_store->exists() && restart_store->load(persisted_state)) {
+            restart_mgr->load_from_persisted(persisted_state);
+        }
+        
+        // Check if restart is allowed
+        auto restart_decision = restart_mgr->should_restart(*config);
+        
+        if (restart_decision == RestartDecision::Quarantine) {
+            std::cerr << "Agent Core: Too many restart attempts, entering quarantine for "
+                      << config->service.quarantine_duration_s << " seconds\n";
+            std::this_thread::sleep_for(std::chrono::seconds(config->service.quarantine_duration_s));
+            return 1;
+        } else if (restart_decision == RestartDecision::QuarantineActive) {
+            std::cerr << "Agent Core: Currently in quarantine period\n";
+            return 1;
+        }
+        
+        // Apply backoff delay if this is a restart after failure
+        if (persisted_state.restart_count > 0) {
+            int delay_ms = restart_mgr->calculate_restart_delay_ms(*config);
+            std::cout << "Agent Core: Applying restart backoff delay: " << delay_ms << "ms\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+        }
+        
+        // Record this restart attempt and persist state
+        restart_mgr->record_restart();
+        persisted_state = restart_mgr->to_persisted();
+        restart_store->save(persisted_state);
+        
         // Create service host
         auto service_host = create_service_host();
         if (!service_host->initialize()) {
@@ -296,7 +412,7 @@ int main(int argc, char* argv[]) {
         
         // Run main loop
         service_host->run([&]() {
-            agent.run(*service_host);
+            agent.run(*service_host, restart_mgr.get(), restart_store.get());
         });
         
         // Cleanup

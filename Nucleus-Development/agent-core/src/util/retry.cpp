@@ -5,6 +5,22 @@
 
 namespace agent {
 
+// Utility function for calculating exponential backoff with jitter
+int calculate_backoff_with_jitter(int attempt, int base_ms, int max_ms, int jitter_pct) {
+    // Exponential backoff
+    int exponential = base_ms * (1 << attempt);
+    int capped = std::min(exponential, max_ms);
+    
+    // Add jitter
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(-jitter_pct, jitter_pct);
+    int jitter_val = dis(gen);
+    int jitter = capped * jitter_val / 100;
+    
+    return capped + jitter;
+}
+
 class RetryPolicyImpl : public RetryPolicy {
 public:
     explicit RetryPolicyImpl(const Config::Retry& config)
@@ -17,16 +33,12 @@ public:
     
     bool execute(std::function<bool()> operation) override {
         if (circuit_state_ == CircuitState::Open) {
-            std::cout << "RetryPolicy: Circuit breaker OPEN, fast-failing\n";
             return false;
         }
         
         for (int attempt = 0; attempt < max_attempts_; ++attempt) {
             if (attempt > 0) {
                 int delay_ms = calculate_backoff(attempt);
-                std::cout << "RetryPolicy: Attempt " << (attempt + 1) 
-                          << "/" << max_attempts_ 
-                          << " after " << delay_ms << "ms\n";
                 std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
             }
             
@@ -39,14 +51,9 @@ public:
             failure_count_++;
         }
         
-        // all attempts exhausted
-        std::cout << "RetryPolicy: All retry attempts exhausted\n";
-        
         // Open circuit breaker after too many failures
         if (failure_count_ >= max_attempts_ * 2) {
             circuit_state_ = CircuitState::Open;
-            std::cout << "RetryPolicy: Circuit breaker opened after " 
-                      << failure_count_ << " failures\n";
         }
         
         return false;
@@ -69,18 +76,8 @@ private:
     int failure_count_;
     
     int calculate_backoff(int attempt) {
-        // Exponential backoff with jitter
-        int exponential = base_ms_ * (1 << attempt);
-        int capped = std::min(exponential, max_ms_);
-        
-        // add jitter (±20%)
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(-20, 20);
-        int jitter_pct = dis(gen);
-        int jitter = capped * jitter_pct / 100;
-        
-        return capped + jitter;
+        // Delegate to shared utility function
+        return calculate_backoff_with_jitter(attempt, base_ms_, max_ms_, 20);
     }
 };
 
