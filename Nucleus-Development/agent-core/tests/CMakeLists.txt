@@ -90,6 +90,21 @@ else()
     target_link_libraries(test_ssm_registration PRIVATE pthread)
 endif()
 
+# Identity discovery test
+add_executable(test_identity
+    integration/test_identity.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_identity PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_identity PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_identity PRIVATE ws2_32)
+else()
+    target_link_libraries(test_identity PRIVATE pthread)
+endif()
+
 # Unit test for RestartManager
 add_executable(test_restart_manager
     unit/test_restart_manager.cpp
@@ -139,6 +154,7 @@ endif()
 add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME RestartQuarantineIntegrationTest COMMAND test_restart_quarantine WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME IdentityDiscoveryTest COMMAND test_identity WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing

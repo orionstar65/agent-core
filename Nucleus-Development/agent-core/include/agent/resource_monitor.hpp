@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <cstdint>
 #include "config.hpp"
 
 namespace agent {

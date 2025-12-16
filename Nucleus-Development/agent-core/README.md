@@ -24,7 +24,7 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 ### Core Subsystems
 1. **ServiceHost** - OS integration (Windows SCM / Linux systemd)
 2. **Config** - JSON configuration with validation
-3. **Identity** - Device vs gateway ID resolution
+3. **Identity** - Device vs gateway ID resolution with registry-first lookup and JSON fallback
 4. **NetPathSelector** - Direct vs tunnel decision logic
 5. **AuthManager** - X.509 certificate lifecycle
 6. **Registration** - Backend registration (MVP: AWS SSM)
@@ -97,6 +97,17 @@ Key configuration sections:
 - `retry`: Backoff and circuit breaker (max attempts, delays)
 - `resource`: CPU/Memory/Network budgets
 - `logging`: Log level and format
+
+### Identity Discovery
+
+Agent Core discovers device identity using a priority-based approach:
+
+1. **Config Override** (highest priority) - Values explicitly set in config file
+2. **Windows Registry** (Windows only) - Reads from `HKLM\SOFTWARE\AgentCore\Identity`
+3. **identity.json** - JSON file fallback (searched in executable directory or current working directory)
+4. **System Discovery** - Falls back to hostname/machine-id
+
+For gateway mode (`isGateway=true`), if standard identity fields are missing, a UUID is automatically generated as the unique identifier.
 
 ### Authentication
 
@@ -352,6 +363,7 @@ ctest --test-dir build --output-on-failure
 
 **Available Tests:**
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
+- `test_identity` - Identity discovery tests (config override, JSON fallback, gateway mode, registry)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
 - `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
 
