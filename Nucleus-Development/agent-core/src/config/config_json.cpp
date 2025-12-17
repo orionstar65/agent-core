@@ -125,6 +125,18 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             if (logging.contains("json")) {
                 config->logging.json = logging["json"].get<bool>();
             }
+            if (logging.contains("throttle")) {
+                auto& throttle = logging["throttle"];
+                if (throttle.contains("enabled")) {
+                    config->logging.throttle.enabled = throttle["enabled"].get<bool>();
+                }
+                if (throttle.contains("errorThreshold")) {
+                    config->logging.throttle.error_threshold = throttle["errorThreshold"].get<int>();
+                }
+                if (throttle.contains("windowSeconds")) {
+                    config->logging.throttle.window_seconds = throttle["windowSeconds"].get<int>();
+                }
+            }
         }
         
         // Parse SSM

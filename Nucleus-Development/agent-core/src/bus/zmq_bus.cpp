@@ -87,12 +87,12 @@ public:
         
         if (logger_) {
             logger_->log(LogLevel::Debug, "Bus", "Published message", 
-                {{"topic", envelope.topic}, {"correlationId", envelope.correlation_id}});
+                {{"topic", envelope.topic}}, "", envelope.correlation_id);
         }
 #else
         if (logger_) {
             logger_->log(LogLevel::Debug, "Bus", "Published message (stub)", 
-                {{"topic", envelope.topic}, {"correlationId", envelope.correlation_id}});
+                {{"topic", envelope.topic}}, "", envelope.correlation_id);
         }
 #endif
     }
@@ -120,13 +120,13 @@ public:
         
         if (logger_) {
             logger_->log(LogLevel::Debug, "Bus", "Request completed", 
-                {{"topic", req.topic}, {"correlationId", req.correlation_id}, 
-                 {"replyCorrelationId", reply.correlation_id}});
+                {{"topic", req.topic}, {"replyCorrelationId", reply.correlation_id}}, 
+                "", req.correlation_id);
         }
 #else
         if (logger_) {
             logger_->log(LogLevel::Debug, "Bus", "Request (stub)", 
-                {{"topic", req.topic}, {"correlationId", req.correlation_id}});
+                {{"topic", req.topic}}, "", req.correlation_id);
         }
         reply.topic = req.topic + ".reply";
         reply.correlation_id = req.correlation_id;

@@ -96,7 +96,10 @@ Key configuration sections:
 - `cert`: Certificate management (path to certificate file)
 - `retry`: Backoff and circuit breaker (max attempts, delays)
 - `resource`: CPU/Memory/Network budgets
-- `logging`: Log level and format
+- `logging`: Log level, format (json/text), and throttling configuration
+  - `throttle.enabled`: Enable/disable error throttling (default: true)
+  - `throttle.errorThreshold`: Number of errors before throttling activates (default: 10)
+  - `throttle.windowSeconds`: Time window for error counting (default: 60)
 
 ### Authentication
 
@@ -280,12 +283,23 @@ The agent follows this startup sequence:
 ## Logging & Metrics
 
 ### Structured Logs
-- Timestamp, level, subsystem, deviceId, correlationId
-- JSON format for machine parsing
-- Configurable log level
+- **Required fields**: timestamp (ISO 8601 UTC), level, subsystem, deviceId, correlationId, eventId
+- JSON format for machine parsing (nlohmann/json)
+- Configurable log level (trace, debug, info, warn, error, critical)
+- Text format also supported for human readability
+- **Log Throttling**: Per-subsystem error throttling to prevent log spam during offline scenarios
+  - Configurable threshold (default: 10 errors)
+  - Time-window based (default: 60 seconds)
+  - Emits activation message and summary on recovery
 
 ### Metrics
-- **Counters**: retry attempts, commands received, heartbeats
+- **Counters**: 
+  - `retry.attempts` - Total retry attempts
+  - `retry.success` - Successful operations after retries
+  - `retry.failures` - Failed operations after all retries
+  - `retry.circuit_open` - Circuit breaker opened events
+  - `log.throttled.{subsystem}` - Throttled log count per subsystem
+  - Commands received, heartbeats
 - **Histograms**: latency distributions
 - **Gauges**: CPU/memory/network usage per process
 
@@ -351,6 +365,10 @@ ctest --test-dir build --output-on-failure
 ```
 
 **Available Tests:**
+- `test_logging` - Structured JSON logging unit tests
+- `test_log_throttler` - Log throttling unit tests
+- `test_retry_metrics` - Retry metrics unit tests
+- `test_logging_throttling` - Logging and throttling integration tests
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
 - `test_ssm_registration` - SSM registration integration tests (some tests require sudo)

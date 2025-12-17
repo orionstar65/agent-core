@@ -46,8 +46,30 @@ public:
         std::cout << "\n=== Agent Core v" << VERSION << " ===\n\n";
         
         // Create subsystems
-        logger_ = create_logger("info", false);
         metrics_ = create_metrics();
+        
+        // Load configuration first to get logging config
+        config_ = load_config(config_path);
+        if (!config_) {
+            std::cerr << "Failed to load configuration\n";
+            return false;
+        }
+        
+        // Create logger with throttling support
+        if (config_->logging.throttle.enabled) {
+            LoggingThrottleConfig throttle_cfg;
+            throttle_cfg.enabled = config_->logging.throttle.enabled;
+            throttle_cfg.error_threshold = config_->logging.throttle.error_threshold;
+            throttle_cfg.window_seconds = config_->logging.throttle.window_seconds;
+            
+            logger_ = create_logger_with_throttle(
+                config_->logging.level, 
+                config_->logging.json,
+                throttle_cfg,
+                metrics_.get());
+        } else {
+            logger_ = create_logger(config_->logging.level, config_->logging.json);
+        }
         
         log(LogLevel::Info, "Core", "Initializing Agent Core");
         
@@ -55,14 +77,8 @@ public:
         current_state_ = AgentState::LOAD_CONFIG;
         log(LogLevel::Info, "Core", "Loading configuration from: " + config_path);
         
-        config_ = load_config(config_path);
-        if (!config_) {
-            log(LogLevel::Error, "Core", "Failed to load configuration");
-            return false;
-        }
-        
-        // Create retry policy
-        retry_policy_ = create_retry_policy(config_->retry);
+        // Create retry policy with metrics
+        retry_policy_ = create_retry_policy(config_->retry, metrics_.get());
         
         // Discover identity
         current_state_ = AgentState::IDENTITY_RESOLVE;
@@ -219,11 +235,13 @@ private:
     std::unique_ptr<ExtensionManager> ext_manager_;
     std::unique_ptr<ResourceMonitor> resource_monitor_;
     
-    void log(LogLevel level, const std::string& subsystem, const std::string& message) {
+    void log(LogLevel level, const std::string& subsystem, const std::string& message, 
+             const std::string& correlationId = "", const std::string& eventId = "") {
         if (logger_) {
             std::map<std::string, std::string> fields;
-            fields["deviceId"] = identity_.device_serial;
-            logger_->log(level, subsystem, message, fields);
+            std::string deviceId = identity_.device_serial.empty() ? 
+                (identity_.is_gateway ? identity_.gateway_id : "") : identity_.device_serial;
+            logger_->log(level, subsystem, message, fields, deviceId, correlationId, eventId);
         }
     }
     
