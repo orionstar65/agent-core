@@ -46,5 +46,13 @@
     "restartMaxDelayMs": 300000,
     "restartJitterFactor": 0.2,
     "quarantineDurationS": 3600
+  },
+  "zmq": {
+    "pubPort": 5555,
+    "reqPort": 5556,
+    "curveEnabled": false,
+    "curveServerKey": "",
+    "curvePublicKey": "",
+    "curveSecretKey": ""
   }
 }

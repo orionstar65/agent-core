@@ -7,11 +7,10 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
-#include "agent/envelope_json.hpp"
+#include "agent/bus.hpp"
+#include "agent/envelope_serialization.hpp"
 
-using Envelope = agent::envelope_json::Envelope;
-using agent::envelope_json::serialize_envelope;
-using agent::envelope_json::deserialize_envelope;
+using namespace agent;
 
 std::atomic<bool> g_running{true};
 
@@ -89,12 +88,32 @@ int main(int argc, char* argv[]) {
         log("INFO", "  Payload:", req.payload_json);
         log("INFO", "  Timestamp:", std::to_string(req.ts_ms));
         
+        // Log headers if present (v2)
+        if (!req.headers.empty()) {
+            log("INFO", "  Headers:");
+            for (const auto& [key, value] : req.headers) {
+                log("INFO", "    " + key + ":", value);
+            }
+        }
+        
+        // Log auth context if present (v2)
+        if (!req.auth_context.uuid.empty()) {
+            log("INFO", "  Auth Context:");
+            log("INFO", "    Device Serial:", req.auth_context.device_serial);
+            log("INFO", "    UUID:", req.auth_context.uuid);
+            log("INFO", "    Cert Valid:", req.auth_context.cert_valid ? "true" : "false");
+        }
+        
         Envelope reply;
         reply.topic = req.topic + ".reply";
-        reply.correlation_id = req.correlation_id;
+        reply.correlation_id = req.correlation_id;  // Preserve correlation ID
         reply.payload_json = R"({"status":"ok","message":"echo reply","requestPayload":)" + req.payload_json + "}";
         reply.ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
+        
+        // Preserve headers and auth_context in reply (v2)
+        reply.headers = req.headers;
+        reply.auth_context = req.auth_context;
         
         std::string reply_json = serialize_envelope(reply);
         zmq::message_t reply_msg(reply_json.data(), reply_json.size());

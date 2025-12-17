@@ -20,9 +20,16 @@
 #include <thread>
 #include <chrono>
 #include <map>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <direct.h>
+#else
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#endif
 
 using namespace agent;
 
@@ -107,7 +114,7 @@ public:
         }
         
         // Initialize subsystems
-        bus_ = create_zmq_bus();
+        bus_ = create_zmq_bus(logger_.get(), config_->zmq);
         mqtt_client_ = create_mqtt_client();
         ext_manager_ = create_extension_manager();
         resource_monitor_ = create_resource_monitor();

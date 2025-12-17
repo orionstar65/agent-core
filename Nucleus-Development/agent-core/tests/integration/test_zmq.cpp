@@ -1,4 +1,5 @@
 #include "agent/bus.hpp"
+#include "agent/config.hpp"
 #include "agent/extension_manager.hpp"
 #include "agent/telemetry.hpp"
 #include "agent/uuid.hpp"
@@ -25,7 +26,10 @@ void test_zmq_request_reply() {
     std::cout << "\n=== Test: ZeroMQ Request/Reply ===\n";
     
     auto logger = create_logger("info", false);
-    auto bus = create_zmq_bus(logger.get());
+    Config::ZeroMQ zmq_config;
+    zmq_config.pub_port = 5555;
+    zmq_config.req_port = 5556;
+    auto bus = create_zmq_bus(logger.get(), zmq_config);
     auto ext_manager = create_extension_manager();
     
     ExtensionSpec spec = create_test_extension_spec();
@@ -59,7 +63,10 @@ void test_zmq_correlation_id_preservation() {
     std::cout << "\n=== Test: Correlation ID Preservation ===\n";
     
     auto logger = create_logger("info", false);
-    auto bus = create_zmq_bus(logger.get());
+    Config::ZeroMQ zmq_config;
+    zmq_config.pub_port = 5555;
+    zmq_config.req_port = 5556;
+    auto bus = create_zmq_bus(logger.get(), zmq_config);
     auto ext_manager = create_extension_manager();
     
     ExtensionSpec spec = create_test_extension_spec();

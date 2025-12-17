@@ -5,13 +5,35 @@
 #include <cassert>
 #include <cstdlib>
 #include <unistd.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <limits.h>
+#else
 #include <linux/limits.h>
+#endif
 
 using namespace agent;
 
 // Get the absolute path to the agent-core directory
 std::string get_agent_core_dir() {
     char exe_path[PATH_MAX];
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(nullptr, exe_path, sizeof(exe_path));
+    if (len == 0 || len >= sizeof(exe_path)) {
+        return "";
+    }
+    exe_path[len] = '\0';
+    std::string path(exe_path);
+    // Test executable is at: agent-core/build/tests/test_ssm_registration.exe
+    // We need to go up to agent-core directory
+    size_t pos = path.rfind("\\build\\tests\\");
+    if (pos == std::string::npos) {
+        pos = path.rfind("/build/tests/");
+    }
+    if (pos != std::string::npos) {
+        return path.substr(0, pos);
+    }
+#else
     ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
     if (len != -1) {
         exe_path[len] = '\0';
@@ -23,6 +45,7 @@ std::string get_agent_core_dir() {
             return path.substr(0, pos);
         }
     }
+#endif
     // Fallback: try to get current working directory and navigate up
     char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) != nullptr) {

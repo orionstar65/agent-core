@@ -67,12 +67,43 @@ if(ZMQ_FOUND)
     target_include_directories(test_zmq PRIVATE ${ZMQ_INCLUDE_DIRS})
     target_link_libraries(test_zmq PRIVATE ${ZMQ_LIBRARIES})
     target_compile_definitions(test_zmq PRIVATE HAVE_ZMQ)
+    # cppzmq headers (header-only library)
+    find_path(CPPZMQ_INCLUDE_DIR zmq.hpp PATHS ${ZMQ_INCLUDE_DIRS} ${CMAKE_PREFIX_PATH}/include)
+    if(CPPZMQ_INCLUDE_DIR)
+        target_include_directories(test_zmq PRIVATE ${CPPZMQ_INCLUDE_DIR})
+    endif()
 endif()
 
 if(WIN32)
     target_link_libraries(test_zmq PRIVATE ws2_32)
 else()
     target_link_libraries(test_zmq PRIVATE pthread)
+endif()
+
+# ZeroMQ load test
+add_executable(test_zmq_load
+    integration/test_zmq_load.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_zmq_load PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_zmq_load PRIVATE CURL::libcurl)
+
+# ZeroMQ
+if(ZMQ_FOUND)
+    target_include_directories(test_zmq_load PRIVATE ${ZMQ_INCLUDE_DIRS})
+    target_link_libraries(test_zmq_load PRIVATE ${ZMQ_LIBRARIES})
+    target_compile_definitions(test_zmq_load PRIVATE HAVE_ZMQ)
+    # cppzmq headers (header-only library)
+    if(CPPZMQ_INCLUDE_DIR)
+        target_include_directories(test_zmq_load PRIVATE ${CPPZMQ_INCLUDE_DIR})
+    endif()
+endif()
+
+if(WIN32)
+    target_link_libraries(test_zmq_load PRIVATE ws2_32)
+else()
+    target_link_libraries(test_zmq_load PRIVATE pthread)
 endif()
 
 # Integration test for SSM Registration
@@ -140,6 +171,7 @@ add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECT
 add_test(NAME RestartQuarantineIntegrationTest COMMAND test_restart_quarantine WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME ZeroMQLoadTest COMMAND test_zmq_load WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full

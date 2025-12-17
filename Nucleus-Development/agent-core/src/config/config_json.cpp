@@ -155,6 +155,29 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             }
         }
         
+        // Parse ZeroMQ
+        if (j.contains("zmq")) {
+            auto& zmq = j["zmq"];
+            if (zmq.contains("pubPort")) {
+                config->zmq.pub_port = zmq["pubPort"].get<int>();
+            }
+            if (zmq.contains("reqPort")) {
+                config->zmq.req_port = zmq["reqPort"].get<int>();
+            }
+            if (zmq.contains("curveEnabled")) {
+                config->zmq.curve_enabled = zmq["curveEnabled"].get<bool>();
+            }
+            if (zmq.contains("curveServerKey")) {
+                config->zmq.curve_server_key = zmq["curveServerKey"].get<std::string>();
+            }
+            if (zmq.contains("curvePublicKey")) {
+                config->zmq.curve_public_key = zmq["curvePublicKey"].get<std::string>();
+            }
+            if (zmq.contains("curveSecretKey")) {
+                config->zmq.curve_secret_key = zmq["curveSecretKey"].get<std::string>();
+            }
+        }
+        
         std::cout << "Config loaded successfully from: " << path << "\n";
         std::cout << "  Backend URL: " << config->backend.base_url << "\n";
         std::cout << "  Device Serial: " << config->identity.device_serial << "\n";

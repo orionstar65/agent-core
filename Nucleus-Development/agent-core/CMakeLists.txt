@@ -87,6 +87,26 @@ if(ZMQ_FOUND)
     target_include_directories(agent-core PRIVATE ${ZMQ_INCLUDE_DIRS})
     target_link_libraries(agent-core PRIVATE ${ZMQ_LIBRARIES})
     target_compile_definitions(agent-core PRIVATE HAVE_ZMQ)
+    
+    # Find cppzmq headers (C++ bindings for ZeroMQ)
+    # On msys64, cppzmq headers are typically in /ucrt64/include
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND EXISTS "C:/msys64/ucrt64/include/zmq.hpp")
+        target_include_directories(agent-core PRIVATE "C:/msys64/ucrt64/include")
+    elseif(EXISTS "${CMAKE_INSTALL_PREFIX}/include/zmq.hpp")
+        target_include_directories(agent-core PRIVATE "${CMAKE_INSTALL_PREFIX}/include")
+    else()
+        # Try to find cppzmq in common locations
+        find_path(CPPZMQ_INCLUDE_DIR zmq.hpp
+            PATHS
+                /usr/include
+                /usr/local/include
+                ${CMAKE_INSTALL_PREFIX}/include
+            NO_DEFAULT_PATH
+        )
+        if(CPPZMQ_INCLUDE_DIR)
+            target_include_directories(agent-core PRIVATE ${CPPZMQ_INCLUDE_DIR})
+        endif()
+    endif()
 endif()
 
 # Installation

@@ -3,8 +3,28 @@
 #include <cassert>
 #include <cstdlib>
 #include <unistd.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace agent;
+
+// Helper function to check if running as root/admin
+bool is_privileged() {
+#ifdef _WIN32
+    BOOL is_admin = FALSE;
+    PSID admin_group = nullptr;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+    if (AllocateAndInitializeSid(&nt_authority, 2, SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &admin_group)) {
+        CheckTokenMembership(nullptr, admin_group, &is_admin);
+        FreeSid(admin_group);
+    }
+    return is_admin == TRUE;
+#else
+    return geteuid() == 0;
+#endif
+}
 
 void cleanup_service() {
     std::cout << "\nCleaning up service installation...\n";
@@ -44,7 +64,7 @@ void test_check_status() {
 void test_install_requires_root() {
     std::cout << "\n=== Test: Install Requires Root ===\n";
     
-    if (geteuid() == 0) {
+    if (is_privileged()) {
         std::cout << "  Running as root, skipping this test\n";
         return;
     }
@@ -62,7 +82,7 @@ void test_install_and_uninstall() {
     std::cout << "\n=== Test: Install and Uninstall Service ===\n";
     std::cout << "  NOTE: This test requires sudo privileges\n";
     
-    if (geteuid() != 0) {
+    if (!is_privileged()) {
         std::cout << "  Skipping: Not running as root\n";
         std::cout << "  Run with: sudo ./build/tests/test_service_installer\n";
         return;
@@ -72,12 +92,21 @@ void test_install_and_uninstall() {
     
     // Get current binary path
     char binary_path[1024];
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(nullptr, binary_path, sizeof(binary_path));
+    if (len == 0 || len >= sizeof(binary_path)) {
+        std::cerr << "  Failed to get binary path\n";
+        return;
+    }
+    binary_path[len] = '\0';
+#else
     ssize_t len = readlink("/proc/self/exe", binary_path, sizeof(binary_path) - 1);
     if (len == -1) {
         std::cerr << "  Failed to get binary path\n";
         return;
     }
     binary_path[len] = '\0';
+#endif
     
     // Use test config path
     std::string config_path = "../../config/example.json";
@@ -140,7 +169,7 @@ void test_directory_creation() {
     std::cout << "\n=== Test: Directory Creation ===\n";
     std::cout << "  NOTE: This test requires sudo privileges\n";
     
-    if (geteuid() != 0) {
+    if (!is_privileged()) {
         std::cout << "  Skipping: Not running as root\n";
         return;
     }
@@ -151,12 +180,21 @@ void test_directory_creation() {
     system("rm -rf /tmp/test-agent-install");
     
     char binary_path[1024];
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(nullptr, binary_path, sizeof(binary_path));
+    if (len == 0 || len >= sizeof(binary_path)) {
+        std::cerr << "  Failed to get binary path\n";
+        return;
+    }
+    binary_path[len] = '\0';
+#else
     ssize_t len = readlink("/proc/self/exe", binary_path, sizeof(binary_path) - 1);
     if (len == -1) {
         std::cerr << "  Failed to get binary path\n";
         return;
     }
     binary_path[len] = '\0';
+#endif
     
     // Install should create necessary directories
     installer->install(binary_path, "../../config/example.json");
@@ -178,7 +216,7 @@ void test_double_install() {
     std::cout << "\n=== Test: Double Install (Idempotent) ===\n";
     std::cout << "  NOTE: This test requires sudo privileges\n";
     
-    if (geteuid() != 0) {
+    if (!is_privileged()) {
         std::cout << "  Skipping: Not running as root\n";
         return;
     }
@@ -186,12 +224,21 @@ void test_double_install() {
     auto installer = create_service_installer();
     
     char binary_path[1024];
+#ifdef _WIN32
+    DWORD len = GetModuleFileNameA(nullptr, binary_path, sizeof(binary_path));
+    if (len == 0 || len >= sizeof(binary_path)) {
+        std::cerr << "  Failed to get binary path\n";
+        return;
+    }
+    binary_path[len] = '\0';
+#else
     ssize_t len = readlink("/proc/self/exe", binary_path, sizeof(binary_path) - 1);
     if (len == -1) {
         std::cerr << "  Failed to get binary path\n";
         return;
     }
     binary_path[len] = '\0';
+#endif
     
     std::string config_path = "../../config/example.json";
     
@@ -229,7 +276,7 @@ int main(int argc, char* argv[]) {
         test_install_requires_root();
         
         // Privileged tests
-        if (run_privileged_tests && geteuid() == 0) {
+        if (run_privileged_tests && is_privileged()) {
             test_directory_creation();
             test_double_install();
             test_install_and_uninstall();
@@ -244,7 +291,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Cleanup at the end of all tests
-        if (run_privileged_tests && geteuid() == 0) {
+        if (run_privileged_tests && is_privileged()) {
             cleanup_service();
         }
         
@@ -254,7 +301,7 @@ int main(int argc, char* argv[]) {
         return 0;
     } catch (const std::exception& e) {
         // Cleanup even on failure
-        if (geteuid() == 0) {
+        if (is_privileged()) {
             cleanup_service();
         }
         
