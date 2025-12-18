@@ -24,18 +24,18 @@ void test_throttling_activation() {
         assert(!should_throttle && "First errors should not be throttled");
     }
     
-    // 5th error should trigger throttling
+    // 5th error triggers throttling but is still logged (not throttled)
     bool should_throttle = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
-    assert(should_throttle && "5th error should be throttled");
+    assert(!should_throttle && "5th error activates throttling but is still logged");
     
-    // Subsequent errors should be throttled
+    // Subsequent errors (6th onwards) should be throttled
     for (int i = 0; i < 10; i++) {
         bool should_throttle = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
-        assert(should_throttle && "Subsequent errors should be throttled");
+        assert(should_throttle && "Errors after threshold should be throttled");
     }
     
     int64_t throttled_count = throttler.get_throttled_count("TestSubsystem");
-    assert(throttled_count == 11 && "Should have throttled 11 errors (5th + 10 more)");
+    assert(throttled_count == 10 && "Should have throttled 10 errors (after threshold)");
     
     std::cout << "✓ Throttling activates after threshold\n";
 }
@@ -50,22 +50,27 @@ void test_per_subsystem_throttling() {
     
     LogThrottler throttler(throttle_config);
     
-    // Trigger throttling for Subsystem1
+    // Trigger throttling for Subsystem1 (first 3 errors)
     for (int i = 0; i < 3; i++) {
-        throttler.should_throttle(LogLevel::Error, "Subsystem1");
+        bool result = throttler.should_throttle(LogLevel::Error, "Subsystem1");
+        assert(!result && "First 3 errors for Subsystem1 not throttled");
     }
+    // 4th error should be throttled
     assert(throttler.should_throttle(LogLevel::Error, "Subsystem1") && 
-           "Subsystem1 should be throttled");
+           "4th error for Subsystem1 should be throttled");
     
-    // Subsystem2 should not be throttled yet
+    // Subsystem2 should not be throttled yet (first 2 errors)
     for (int i = 0; i < 2; i++) {
         bool should_throttle = throttler.should_throttle(LogLevel::Error, "Subsystem2");
-        assert(!should_throttle && "Subsystem2 should not be throttled yet");
+        assert(!should_throttle && "First 2 errors for Subsystem2 not throttled");
     }
     
-    // Trigger throttling for Subsystem2
+    // 3rd error for Subsystem2 activates throttling but is still logged
+    assert(!throttler.should_throttle(LogLevel::Error, "Subsystem2") && 
+           "3rd error for Subsystem2 activates throttling but is still logged");
+    // 4th error should be throttled
     assert(throttler.should_throttle(LogLevel::Error, "Subsystem2") && 
-           "Subsystem2 should now be throttled");
+           "4th error for Subsystem2 should be throttled");
     
     std::cout << "✓ Per-subsystem throttling works independently\n";
 }
@@ -154,18 +159,24 @@ void test_throttled_count_tracking() {
     
     LogThrottler throttler(throttle_config);
     
-    // Trigger throttling
-    for (int i = 0; i < 3; i++) {
-        throttler.should_throttle(LogLevel::Error, "TestSubsystem");
-    }
+    // Trigger throttling (first 3 errors)
+    bool throttled1 = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
+    bool throttled2 = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
+    bool throttled3 = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
     
-    // Throttle 5 more errors
+    assert(!throttled1 && "First error should not be throttled");
+    assert(!throttled2 && "Second error should not be throttled");
+    assert(!throttled3 && "Third error activates throttling but is still logged");
+    
+    // Throttle 5 more errors (these are throttled)
     for (int i = 0; i < 5; i++) {
-        throttler.should_throttle(LogLevel::Error, "TestSubsystem");
+        bool result = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
+        assert(result && "Should be throttled after threshold");
     }
     
+    // Throttled count should be 5 (errors after the threshold)
     int64_t throttled = throttler.get_throttled_count("TestSubsystem");
-    assert(throttled == 5 && "Should have throttled 5 errors");
+    assert(throttled == 5 && "Should have throttled 5 errors after threshold");
     
     std::cout << "✓ Throttled count tracked correctly\n";
 }

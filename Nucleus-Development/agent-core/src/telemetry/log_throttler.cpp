@@ -26,13 +26,15 @@ bool LogThrottler::should_throttle(LogLevel level, const std::string& subsystem)
     // Increment error count
     state.error_count++;
     
-    // Check if we should start throttling
+    // Check if we should start throttling (AFTER this error)
     if (!state.is_throttled && state.error_count >= config_.error_threshold) {
         state.is_throttled = true;
         state.just_activated = true;
+        // Don't throttle this error - let it through as the last one before throttling
+        return false;
     }
     
-    // If throttled, suppress this log
+    // If already throttled (from previous errors), suppress this log
     if (state.is_throttled) {
         state.throttled_count++;
         if (metrics_) {

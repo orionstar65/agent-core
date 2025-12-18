@@ -134,6 +134,7 @@ void test_log_level_filtering() {
     
     LogCapture capture;
     auto logger = create_logger("warn", true);
+    capture.clear();  // Clear initialization message
     
     // These should be filtered out
     logger->log(LogLevel::Trace, "Test", "Trace message");

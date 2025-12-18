@@ -52,7 +52,7 @@ public:
             if (operation()) {
                 // Success
                 if (metrics_) {
-                    metrics_->increment("retry.attempts", attempts_made);
+                    metrics_->increment("retry.attempts");  // Count this successful attempt
                     metrics_->increment("retry.success");
                 }
                 reset();

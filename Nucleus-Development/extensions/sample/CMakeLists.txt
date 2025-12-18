@@ -10,7 +10,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../../agent-core/cmake)
 # Find ZeroMQ
 include(FindZeroMQ)
 
-add_executable(sample-ext main.cpp)
+add_executable(sample-ext 
+    main.cpp
+    ../../agent-core/src/bus/envelope_serialization.cpp)
 
 target_include_directories(sample-ext PRIVATE ../../agent-core/include)
 
