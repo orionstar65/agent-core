@@ -23,6 +23,7 @@ set(AGENT_LIB_SOURCES
     ../src/util/uuid.cpp
     ../src/telemetry/logging.cpp
     ../src/telemetry/metrics.cpp
+    ../src/telemetry/log_throttler.cpp
 )
 
 # Platform-specific sources
@@ -120,6 +121,51 @@ else()
     target_link_libraries(test_restart_manager PRIVATE pthread)
 endif()
 
+# Unit test for Structured Logging
+add_executable(test_logging
+    unit/test_logging.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_logging PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_logging PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_logging PRIVATE ws2_32)
+else()
+    target_link_libraries(test_logging PRIVATE pthread)
+endif()
+
+# Unit test for Log Throttler
+add_executable(test_log_throttler
+    unit/test_log_throttler.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_log_throttler PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_log_throttler PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_log_throttler PRIVATE ws2_32)
+else()
+    target_link_libraries(test_log_throttler PRIVATE pthread)
+endif()
+
+# Unit test for Retry Metrics
+add_executable(test_retry_metrics
+    unit/test_retry_metrics.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_retry_metrics PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_retry_metrics PRIVATE ws2_32)
+else()
+    target_link_libraries(test_retry_metrics PRIVATE pthread)
+endif()
+
 # Integration test for Restart/Quarantine
 add_executable(test_restart_quarantine
     integration/test_restart_quarantine.cpp
@@ -137,7 +183,7 @@ endif()
 
 # Integration test for Service Installer
 add_executable(test_service_installer
-    integration/test_service_installer.cpp
+integration/test_service_installer.cpp
     ${AGENT_LIB_SOURCES}
 )
 
@@ -150,12 +196,31 @@ else()
     target_link_libraries(test_service_installer PRIVATE pthread)
 endif()
 
+# Integration test for Logging & Throttling
+add_executable(test_logging_throttling
+    integration/test_logging_throttling.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_logging_throttling PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_logging_throttling PRIVATE ws2_32)
+else()
+    target_link_libraries(test_logging_throttling PRIVATE pthread)
+endif()
+
 # Register tests with CTest and set working directory
 add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME LoggingUnitTest COMMAND test_logging WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME LogThrottlerUnitTest COMMAND test_log_throttler WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME RetryMetricsUnitTest COMMAND test_retry_metrics WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME RestartQuarantineIntegrationTest COMMAND test_restart_quarantine WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME IdentityDiscoveryTest COMMAND test_identity WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME LoggingThrottlingIntegrationTest COMMAND test_logging_throttling WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full

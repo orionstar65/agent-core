@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <cstdint>

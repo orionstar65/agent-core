@@ -54,6 +54,7 @@ set(AGENT_CORE_SOURCES
     src/util/uuid.cpp
     src/telemetry/logging.cpp
     src/telemetry/metrics.cpp
+    src/telemetry/log_throttler.cpp
 )
 
 # Platform-specific sources

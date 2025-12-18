@@ -7,6 +7,9 @@
 
 namespace agent {
 
+// Forward declaration
+class Metrics;
+
 enum class CircuitState {
     Closed,      // Normal operation
     Open,        // Too many failures, fast-fail
@@ -29,7 +32,7 @@ public:
 };
 
 // Create retry policy with exponential backoff and jitter
-std::unique_ptr<RetryPolicy> create_retry_policy(const Config::Retry& config);
+std::unique_ptr<RetryPolicy> create_retry_policy(const Config::Retry& config, Metrics* metrics = nullptr);
 
 // Utility function: Calculate exponential backoff with jitter
 // attempt: 0-based attempt number (0 = first attempt, no delay)

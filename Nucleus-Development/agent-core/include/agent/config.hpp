@@ -51,6 +51,11 @@ struct Config {
     struct Logging {
         std::string level{"info"};
         bool json{true};
+        struct Throttle {
+            bool enabled{true};
+            int error_threshold{10};
+            int window_seconds{60};
+        } throttle;
     } logging;
 
     struct Ssm {
