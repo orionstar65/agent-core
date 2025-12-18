@@ -21,7 +21,11 @@ void cleanup_test_state() {
 
 void ensure_state_dir() {
 #ifdef _WIN32
+#ifdef _MSC_VER
     _mkdir(TEST_STATE_DIR.c_str());
+#else
+    mkdir(TEST_STATE_DIR.c_str());
+#endif
 #else
     mkdir(TEST_STATE_DIR.c_str(), 0755);
 #endif

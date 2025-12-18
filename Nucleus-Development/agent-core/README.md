@@ -29,7 +29,7 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 5. **AuthManager** - X.509 certificate lifecycle
 6. **Registration** - Backend registration (MVP: AWS SSM)
 7. **MqttClient** - Secure MQTT connection
-8. **Bus** - ZeroMQ IPC (PUB/SUB + REQ/REP)
+8. **Bus** - ZeroMQ IPC (PUB/SUB + REQ/REP) with message envelopes, topic filtering, and optional CURVE encryption
 9. **ExtensionManager** - Process lifecycle and supervision
 10. **ResourceMonitor** - Budget enforcement
 11. **Telemetry** - Structured logging and metrics
@@ -100,6 +100,7 @@ Key configuration sections:
   - `throttle.enabled`: Enable/disable error throttling (default: true)
   - `throttle.errorThreshold`: Number of errors before throttling activates (default: 10)
   - `throttle.windowSeconds`: Time window for error counting (default: 60)
+- `zmq`: ZeroMQ bus configuration (ports, optional CURVE encryption)
 
 ### Identity Discovery
 
@@ -168,6 +169,14 @@ After successful authentication, Agent Core registers with AWS Systems Manager:
   },
   "ssm": {
     "agentPath": "/snap/amazon-ssm-agent/current/amazon-ssm-agent"
+  },
+  "zmq": {
+    "pubPort": 5555,
+    "reqPort": 5556,
+    "curveEnabled": false,
+    "curveServerKey": "",
+    "curvePublicKey": "",
+    "curveSecretKey": ""
   }
 }
 ```
@@ -247,35 +256,95 @@ eventvwr.msc
 
 ## Extensions
 
-Extensions are separate executables launched from `manifests/extensions.json`. They communicate over ZeroMQ using the common Envelope contract.
+Extensions are separate executables launched from `manifests/extensions.json`. They communicate over ZeroMQ using versioned message envelopes with headers, authentication context, and topic-based routing.
+
+### ZeroMQ Bus Features
+
+- **Message Envelopes**: Versioned message format (v1, v2) with backward compatibility
+- **Headers**: Key-value metadata for message routing and processing hints
+- **Auth Context**: Device identity and certificate information in every message
+- **Topic Filtering**: Support for exact match, prefix patterns (`ext.ps.`), and wildcards (`ext.ps.*`)
+- **Correlation IDs**: Request/response correlation with automatic ID preservation
+- **CURVE Encryption**: Optional end-to-end encryption for inter-process communication (configurable)
+- **Cross-Platform Transport**: 
+  - **Linux**: Uses IPC sockets (`ipc:///tmp/agent-bus-*`) for efficient in-process communication
+  - **Windows**: Uses TCP localhost (`tcp://127.0.0.1:port`) due to ZeroMQ IPC limitations on Windows
+  - **CURVE Encryption**: Only applied to TCP connections (Windows or when explicitly enabled)
 
 ### Extension Contract (ZeroMQ)
 
-#### Envelope Structure
+#### Envelope Structure (Version 2)
+
+```json
+{
+  "v": 2,
+  "topic": "ext.ps.exec.req",
+  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
+  "payload": {
+    "action": "ExecuteScript",
+    "script": "Get-Process",
+    "timeout": 30
+  },
+  "ts": 1731283200000,
+  "headers": {
+    "source": "agent-core",
+    "priority": "normal"
+  },
+  "authContext": {
+    "deviceSerial": "SN123456",
+    "gatewayId": "",
+    "uuid": "device-uuid-123",
+    "certValid": true,
+    "certExpiresMs": 1733875200000
+  }
+}
+```
+
+#### Version 1 (Legacy - Still Supported)
+
 ```json
 {
   "v": 1,
-  "action": "StartTunnel",
-  "params": { "mode": "vpn" },
+  "topic": "ext.tunnel.start",
   "correlationId": "uuid",
-  "requestedBy": "agent-core",
+  "payload": { "mode": "vpn" },
   "ts": 1731283200000
 }
 ```
 
-#### Example: Tunnel Extension
+#### Topic Subscription Patterns
+
+- **Exact match**: `"ext.ps.exec.req"` - matches only this exact topic
+- **Prefix match**: `"ext.ps."` - matches all topics starting with this prefix
+- **Wildcard**: `"ext.ps.*"` - matches all topics starting with `ext.ps.`
+
+#### Example: Tunnel Extension Response
 ```json
 {
-  "v": 1,
+  "v": 2,
+  "topic": "ext.tunnel.ready",
+  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
+  "payload": {
   "event": "TunnelReady",
   "details": {
     "path": "vpn",
     "resolver": "unbound",
     "routes": ["10.0.0.0/16"]
+    }
   },
-  "correlationId": "uuid"
+  "ts": 1731283200100,
+  "headers": {
+    "source": "tunnel-extension"
+  },
+  "authContext": {
+    "deviceSerial": "SN123456",
+    "uuid": "device-uuid-123",
+    "certValid": true
+  }
 }
 ```
+
+For detailed schema documentation, see `docs/envelope_schema.md`.
 
 ## State Machine
 
@@ -383,6 +452,7 @@ ctest --test-dir build --output-on-failure
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 - `test_identity` - Identity discovery tests (config override, JSON fallback, gateway mode, registry)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
+- `test_zmq_load` - ZeroMQ load tests (10k msgs/min, PUB/SUB, REQ/REP, soak test)
 - `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
 
 ### ZeroMQ Integration Test
@@ -407,9 +477,49 @@ The test will:
 4. Test correlation ID preservation
 5. Clean up by stopping the extension
 
+### ZeroMQ Load Test
+
+The ZeroMQ load test verifies message throughput and reliability:
+
+```bash
+# Run the load test
+./build/tests/test_zmq_load
+```
+
+The test validates:
+1. **PUB/SUB Load Test**: 10k messages/minute with zero loss verification
+2. **REQ/REP Load Test**: Request/response pattern with correlation ID matching
+3. **Soak Test**: Extended 60-second run to verify stability
+
+**Test Results:**
+- Target: 10k messages/minute (~167 msgs/sec)
+- Verifies: Zero message loss, latency measurements, throughput validation
+
 **Prerequisites:**
 - Sample extension must be built at `extensions/sample/build/sample-ext`
 - ZeroMQ must be installed and available
+
+**ZeroMQ Configuration:**
+
+The ZeroMQ bus can be configured in the `zmq` section of the config file:
+
+```json
+{
+  "zmq": {
+    "pubPort": 5555,        // PUB/SUB port (default: 5555)
+    "reqPort": 5556,        // REQ/REP port (default: 5556)
+    "curveEnabled": false,  // Enable CURVE encryption for inter-process (TCP) connections
+    "curveServerKey": "",    // Server public key (40 chars base64) - required if curveEnabled=true
+    "curvePublicKey": "",    // Client public key (40 chars base64) - required if curveEnabled=true
+    "curveSecretKey": ""     // Client secret key (40 chars base64) - required if curveEnabled=true
+  }
+}
+```
+
+**Platform-Specific Transport:**
+- **Linux**: Uses IPC sockets (`ipc:///tmp/agent-bus-pub`, `ipc:///tmp/agent-bus-req`) for efficient local communication. IPC sockets are automatically cleaned up when the process exits. Port numbers are ignored on Linux (IPC paths are used instead).
+- **Windows**: Uses TCP localhost (`tcp://127.0.0.1:pubPort`, `tcp://127.0.0.1:reqPort`) because ZeroMQ IPC doesn't work reliably on Windows. Port numbers from config are used.
+- **CURVE Encryption**: Only applied to TCP connections (Windows or when explicitly enabled). IPC connections on Linux do not use CURVE encryption as they are already local-only and more efficient.
 
 ### SSM Registration Integration Test
 

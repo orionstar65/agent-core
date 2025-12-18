@@ -61,7 +61,7 @@ struct Config {
     struct Ssm {
         std::string agent_path;
     } ssm;
-
+    
     struct Service {
         int max_restart_attempts{5};
         int restart_base_delay_ms{1000};
@@ -69,6 +69,15 @@ struct Config {
         double restart_jitter_factor{0.2};  // 20% jitter
         int quarantine_duration_s{3600};    // 1 hour
     } service;
+
+    struct ZeroMQ {
+        int pub_port{5555};  // Port for PUB/SUB (publish/subscribe)
+        int req_port{5556};  // Port for REQ/REP (request/reply)
+        bool curve_enabled{false};  // Enable CURVE encryption for inter-process (TCP) connections
+        std::string curve_server_key;  // Server public key (40 chars base64)
+        std::string curve_public_key;  // Client public key (40 chars base64)
+        std::string curve_secret_key;  // Client secret key (40 chars base64)
+    } zmq;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);
