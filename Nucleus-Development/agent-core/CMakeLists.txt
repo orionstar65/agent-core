@@ -47,6 +47,7 @@ set(AGENT_CORE_SOURCES
     src/bus/zmq_bus.cpp
     src/bus/envelope_serialization.cpp
     src/ext/extension_manager.cpp
+    src/ext/extension_manifest.cpp
     src/res/resource_monitor.cpp
     src/service/restart_manager.cpp
     src/service/restart_state_store.cpp
@@ -110,8 +111,32 @@ if(ZMQ_FOUND)
     endif()
 endif()
 
+# Health query tool
+set(HEALTH_TOOL_SOURCES
+    tools/health_query.cpp
+    src/bus/zmq_bus.cpp
+    src/bus/envelope_serialization.cpp
+    src/util/uuid.cpp
+    src/telemetry/logging.cpp
+)
+
+add_executable(agent-health-query ${HEALTH_TOOL_SOURCES})
+target_link_libraries(agent-health-query PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(agent-health-query PRIVATE ws2_32)
+else()
+    target_link_libraries(agent-health-query PRIVATE pthread)
+endif()
+
+if(ZMQ_FOUND)
+    target_include_directories(agent-health-query PRIVATE ${ZMQ_INCLUDE_DIRS})
+    target_link_libraries(agent-health-query PRIVATE ${ZMQ_LIBRARIES})
+    target_compile_definitions(agent-health-query PRIVATE HAVE_ZMQ)
+endif()
+
 # Installation
-install(TARGETS agent-core DESTINATION bin)
+install(TARGETS agent-core agent-health-query DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 
 # Optional: Tests subdirectory

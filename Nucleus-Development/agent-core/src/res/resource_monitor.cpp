@@ -5,7 +5,7 @@ namespace agent {
 
 class ResourceMonitorImpl : public ResourceMonitor {
 public:
-    ResourceUsage sample(const std::string& process_name) const override {
+    ResourceUsage sample(const std::string&) const override {
         ResourceUsage usage;
         
         // TODO: Implement actual resource sampling

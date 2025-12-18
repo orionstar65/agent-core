@@ -256,7 +256,128 @@ eventvwr.msc
 
 ## Extensions
 
-Extensions are separate executables launched from `manifests/extensions.json`. They communicate over ZeroMQ using versioned message envelopes with headers, authentication context, and topic-based routing.
+Extensions are separate executables launched from `manifests/extensions.json`. Agent Core manages their entire lifecycle including launch, monitoring, crash recovery, and quarantine. Communication occurs over ZeroMQ using versioned message envelopes with headers, authentication context, and topic-based routing.
+
+### Extension Management
+
+The ExtensionManager provides comprehensive process supervision:
+
+**Features:**
+- **Manifest-driven launch**: Extensions defined in JSON manifest with executable paths and arguments
+- **Crash detection**: Detects crashed processes within 5 seconds using non-blocking process checks
+- **Automatic restart**: Failed extensions restart automatically with exponential backoff and jitter
+- **Quarantine**: Extensions exceeding max restart attempts are quarantined (default: 3 attempts → 5 minute quarantine)
+- **Health monitoring**: Periodic health pings track extension responsiveness
+- **State tracking**: Maintains detailed state for each extension (Running, Crashed, Quarantined, etc.)
+- **Graceful shutdown**: Extensions receive SIGTERM for clean termination
+
+**Extension States:**
+- `Stopped` (0) - Extension not running
+- `Running` (1) - Extension process active and healthy
+- `Starting` (2) - Extension launching (transient state)
+- `Crashed` (3) - Extension process terminated unexpectedly
+- `Quarantined` (4) - Extension quarantined after repeated crashes
+
+### Extension Manifest
+
+Extensions are defined in `manifests/extensions.json`:
+
+```json
+{
+  "comment": "Extension manifest for agent-core",
+  "extensions": [
+    {
+      "name": "tunnel",
+      "execPath": "../extensions/tunnel/build/ext-tunnel",
+      "args": ["--config", "config/tunnel.json"],
+      "critical": true,
+      "enabled": false,
+      "description": "VPN/IPsec tunnel management"
+    },
+    {
+      "name": "ps-exec",
+      "execPath": "../extensions/ps-exec/build/ext-ps",
+      "args": [],
+      "critical": false,
+      "enabled": false,
+      "description": "PowerShell script execution"
+    }
+  ]
+}
+```
+
+**Manifest Fields:**
+- `name`: Unique extension identifier
+- `execPath`: Path to extension executable (absolute or relative)
+- `args`: Command-line arguments passed to extension
+- `critical`: Whether extension failure affects agent stability
+- `enabled`: Whether to launch extension (allows selective enabling)
+- `description`: Human-readable description
+
+### Extension Configuration
+
+Extension behavior is configured in the main agent configuration:
+
+```json
+{
+  "extensions": {
+    "manifestPath": "manifests/extensions.json",
+    "maxRestartAttempts": 3,
+    "restartBaseDelayMs": 1000,
+    "restartMaxDelayMs": 60000,
+    "quarantineDurationS": 300,
+    "healthCheckIntervalS": 30,
+    "crashDetectionIntervalS": 5
+  }
+}
+```
+
+**Configuration Options:**
+- `manifestPath`: Path to extension manifest JSON file
+- `maxRestartAttempts`: Number of restart attempts before quarantine (default: 3)
+- `restartBaseDelayMs`: Initial restart delay in milliseconds (default: 1000ms)
+- `restartMaxDelayMs`: Maximum restart delay in milliseconds (default: 60000ms)
+- `quarantineDurationS`: Quarantine duration in seconds (default: 300s = 5 minutes)
+- `healthCheckIntervalS`: Interval for health pings in seconds (default: 30s)
+- `crashDetectionIntervalS`: Interval for crash detection checks in seconds (default: 5s)
+
+**Restart Behavior:**
+1. Extension crashes → Detected within 5 seconds
+2. First restart after ~1 second (base delay + jitter)
+3. Second restart after ~2 seconds (exponential backoff)
+4. Third restart after ~4 seconds
+5. After 3rd crash → Quarantined for 5 minutes
+6. After quarantine expires → Restart attempt (counter reset)
+
+### Health Monitoring
+
+Query extension health status via ZeroMQ:
+
+```bash
+# Query health using CLI tool
+./build/agent-health-query
+```
+
+**Health Response Example:**
+```json
+{
+  "extensions": [
+    {
+      "name": "tunnel",
+      "state": 1,
+      "restart_count": 0,
+      "responding": true
+    },
+    {
+      "name": "ps-exec",
+      "state": 4,
+      "restart_count": 3,
+      "responding": false
+    }
+  ],
+  "agent_uptime_s": 3600
+}
+```
 
 ### ZeroMQ Bus Features
 
@@ -345,6 +466,53 @@ Extensions are separate executables launched from `manifests/extensions.json`. T
 ```
 
 For detailed schema documentation, see `docs/envelope_schema.md`.
+
+### Extension Development
+
+Extensions are independent executables that communicate with Agent Core via ZeroMQ:
+
+**Requirements:**
+1. Connect to ZeroMQ bus (IPC endpoint: `ipc:///tmp/agent-bus-pub` on Linux, TCP on Windows)
+2. Subscribe to relevant topics
+3. Publish events/responses with correlation IDs
+4. Handle SIGTERM for graceful shutdown
+5. Maintain process health (avoid crashes/hangs)
+
+**Example Extension Structure:**
+```cpp
+#include "agent/bus.hpp"
+
+int main() {
+    auto bus = create_zmq_bus();
+    
+    // Subscribe to commands
+    bus->subscribe("ext.myext.*", [](const Envelope& msg) {
+        // Handle command
+        std::cout << "Received: " << msg.topic << "\n";
+    });
+    
+    // Publish status
+    Envelope status;
+    status.topic = "ext.myext.status";
+    status.payload_json = "{\"status\":\"ready\"}";
+    bus->publish(status);
+    
+    // Event loop
+    while (running) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    
+    return 0;
+}
+```
+
+**Best Practices:**
+- Use correlation IDs for request/response patterns
+- Implement health check responders
+- Log errors before crashing (helps debugging)
+- Handle signals gracefully (SIGTERM, SIGINT)
+- Avoid tight loops (causes high CPU usage)
+- Test crash recovery and restart behavior
 
 ## State Machine
 

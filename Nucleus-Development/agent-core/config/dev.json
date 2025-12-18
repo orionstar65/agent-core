@@ -54,5 +54,14 @@
     "curveServerKey": "",
     "curvePublicKey": "",
     "curveSecretKey": ""
+  },
+  "extensions": {
+    "manifestPath": "manifests/extensions.json",
+    "maxRestartAttempts": 3,
+    "restartBaseDelayMs": 1000,
+    "restartMaxDelayMs": 60000,
+    "quarantineDurationS": 300,
+    "healthCheckIntervalS": 30,
+    "crashDetectionIntervalS": 5
   }
 }

@@ -1,6 +1,7 @@
 #include "agent/bus.hpp"
 #include "agent/config.hpp"
 #include "agent/extension_manager.hpp"
+#include "agent/config.hpp"
 #include "agent/telemetry.hpp"
 #include "agent/uuid.hpp"
 #include <iostream>
@@ -9,6 +10,15 @@
 #include <chrono>
 
 using namespace agent;
+
+Config::Extensions create_test_extension_config() {
+    Config::Extensions config;
+    config.max_restart_attempts = 3;
+    config.restart_base_delay_ms = 1000;
+    config.restart_max_delay_ms = 60000;
+    config.quarantine_duration_s = 300;
+    return config;
+}
 
 // Test helper to create a test extension spec
 ExtensionSpec create_test_extension_spec() {
@@ -30,7 +40,7 @@ void test_zmq_request_reply() {
     zmq_config.pub_port = 5555;
     zmq_config.req_port = 5556;
     auto bus = create_zmq_bus(logger.get(), zmq_config);
-    auto ext_manager = create_extension_manager();
+    auto ext_manager = create_extension_manager(create_test_extension_config());
     
     ExtensionSpec spec = create_test_extension_spec();
     std::vector<ExtensionSpec> ext_specs;
@@ -67,7 +77,7 @@ void test_zmq_correlation_id_preservation() {
     zmq_config.pub_port = 5555;
     zmq_config.req_port = 5556;
     auto bus = create_zmq_bus(logger.get(), zmq_config);
-    auto ext_manager = create_extension_manager();
+    auto ext_manager = create_extension_manager(create_test_extension_config());
     
     ExtensionSpec spec = create_test_extension_spec();
     std::vector<ExtensionSpec> ext_specs;

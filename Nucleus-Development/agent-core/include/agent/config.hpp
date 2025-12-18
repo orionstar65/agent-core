@@ -78,6 +78,16 @@ struct Config {
         std::string curve_public_key;  // Client public key (40 chars base64)
         std::string curve_secret_key;  // Client secret key (40 chars base64)
     } zmq;
+
+    struct Extensions {
+        std::string manifest_path{"manifests/extensions.json"};
+        int max_restart_attempts{3};
+        int restart_base_delay_ms{1000};
+        int restart_max_delay_ms{60000};    // 1 minute
+        int quarantine_duration_s{300};     // 5 minutes
+        int health_check_interval_s{30};
+        int crash_detection_interval_s{5};
+    } extensions;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);

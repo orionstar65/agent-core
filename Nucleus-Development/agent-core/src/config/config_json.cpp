@@ -190,6 +190,34 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             }
         }
         
+        // Parse Extensions
+        if (j.contains("extensions")) {
+            auto& ext = j["extensions"];
+            if (ext.contains("manifestPath")) {
+                config->extensions.manifest_path = ext["manifestPath"].get<std::string>();
+            }
+            if (ext.contains("maxRestartAttempts")) {
+                config->extensions.max_restart_attempts = ext["maxRestartAttempts"].get<int>();
+            }
+            if (ext.contains("restartBaseDelayMs")) {
+                config->extensions.restart_base_delay_ms = ext["restartBaseDelayMs"].get<int>();
+            }
+            if (ext.contains("restartMaxDelayMs")) {
+                config->extensions.restart_max_delay_ms = ext["restartMaxDelayMs"].get<int>();
+            }
+            if (ext.contains("quarantineDurationS")) {
+                config->extensions.quarantine_duration_s = ext["quarantineDurationS"].get<int>();
+            }
+            if (ext.contains("healthCheckIntervalS")) {
+                config->extensions.health_check_interval_s = ext["healthCheckIntervalS"].get<int>();
+            }
+            if (ext.contains("crashDetectionIntervalS")) {
+                config->extensions.crash_detection_interval_s = ext["crashDetectionIntervalS"].get<int>();
+            }
+        }
+        
+        return config;
+        
         std::cout << "Config loaded successfully from: " << path << "\n";
         std::cout << "  Backend URL: " << config->backend.base_url << "\n";
         std::cout << "  Device Serial: " << config->identity.device_serial << "\n";

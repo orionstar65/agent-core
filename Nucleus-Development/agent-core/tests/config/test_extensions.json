@@ -1,0 +1,14 @@
+{
+  "extensions": {
+    "sampleExtensionPath": "../../extensions/sample/build/sample-ext",
+    "fallbackScripts": {
+      "sleep": "sleep 10",
+      "crash": "exit 1"
+    }
+  },
+  "tests": {
+    "useRealExtension": true,
+    "extensionStartupDelayMs": 200,
+    "crashDetectionDelayMs": 500
+  }
+}

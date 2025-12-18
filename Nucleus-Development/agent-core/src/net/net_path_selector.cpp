@@ -5,7 +5,7 @@ namespace agent {
 
 class NetPathSelectorImpl : public NetPathSelector {
 public:
-    NetDecision decide(const Config& config, const Identity& identity) override {
+    NetDecision decide(const Config& config, const Identity&) override {
         NetDecision decision;
         
         // Simple logic: if tunnel is enabled in config, request tunnel path

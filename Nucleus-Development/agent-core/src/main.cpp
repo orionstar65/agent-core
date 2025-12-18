@@ -132,7 +132,7 @@ public:
         // Initialize subsystems
         bus_ = create_zmq_bus(logger_.get(), config_->zmq);
         mqtt_client_ = create_mqtt_client();
-        ext_manager_ = create_extension_manager();
+        ext_manager_ = create_extension_manager(config_->extensions);
         resource_monitor_ = create_resource_monitor();
         
         log(LogLevel::Info, "Core", "Initialization complete");
@@ -156,9 +156,14 @@ public:
                 handle_command(msg);
             });
         
-        // launch extensions (if any configured)
-        std::vector<ExtensionSpec> ext_specs;
+        // Setup ZeroMQ health query subscription
+        bus_->subscribe("agent.health.query", 
+            [this](const Envelope& req) {
+                handle_health_query(req);
+            });
         
+        // Load and launch extensions from manifest
+        auto ext_specs = load_extension_manifest(config_->extensions.manifest_path);
         if (!ext_specs.empty()) {
             ext_manager_->launch(ext_specs);
         }
@@ -196,8 +201,14 @@ public:
                 check_resources();
             }
             
-            // Extension health checks
-            if (loop_count % 20 == 0) {
+            // Extension monitoring (crash detection, restarts)
+            if (loop_count % config_->extensions.crash_detection_interval_s == 0) {
+                ext_manager_->monitor();
+            }
+            
+            // Extension health pings
+            if (loop_count % config_->extensions.health_check_interval_s == 0) {
+                ext_manager_->health_ping();
                 check_extension_health();
             }
             
@@ -303,6 +314,49 @@ private:
         
         if (metrics_) {
             metrics_->increment("commands.received");
+        }
+    }
+    
+    void handle_health_query(const Envelope& req) {
+        log(LogLevel::Debug, "Health", "Received health query");
+        
+        // Get health status from extension manager
+        auto health_map = ext_manager_->health_status();
+        
+        // Build JSON response
+        std::string json = "{\"extensions\":[";
+        bool first = true;
+        
+        for (const auto& [name, health] : health_map) {
+            if (!first) json += ",";
+            first = false;
+            
+            json += "{";
+            json += "\"name\":\"" + name + "\",";
+            json += "\"state\":" + std::to_string(static_cast<int>(health.state)) + ",";
+            json += "\"restart_count\":" + std::to_string(health.restart_count) + ",";
+            json += "\"responding\":" + std::string(health.responding ? "true" : "false");
+            json += "}";
+        }
+        
+        json += "],";
+        json += "\"agent_uptime_s\":" + std::to_string(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - start_time_).count());
+        json += "}";
+        
+        // Send response via bus
+        Envelope reply;
+        reply.topic = req.topic + ".reply";
+        reply.correlation_id = req.correlation_id;
+        reply.payload_json = json;
+        reply.ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        
+        bus_->publish(reply);
+        
+        if (metrics_) {
+            metrics_->increment("health.queries");
         }
     }
 };
