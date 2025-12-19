@@ -118,6 +118,8 @@ set(HEALTH_TOOL_SOURCES
     src/bus/envelope_serialization.cpp
     src/util/uuid.cpp
     src/telemetry/logging.cpp
+    src/telemetry/log_throttler.cpp
+    src/telemetry/metrics.cpp
 )
 
 add_executable(agent-health-query ${HEALTH_TOOL_SOURCES})

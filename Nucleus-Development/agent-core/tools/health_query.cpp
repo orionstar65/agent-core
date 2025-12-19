@@ -1,4 +1,6 @@
 #include "agent/bus.hpp"
+#include "agent/config.hpp"
+#include "agent/telemetry.hpp"
 #include "agent/uuid.hpp"
 #include <iostream>
 #include <chrono>
@@ -9,8 +11,14 @@ int main(int, char**) {
     std::cout << "=== Agent Core Health Query Tool ===\n\n";
     
     try {
+        // Create logger and ZeroMQ config
+        auto logger = create_logger("warn", false);
+        Config::ZeroMQ zmq_config;
+        zmq_config.pub_port = 5555;
+        zmq_config.req_port = 5556;
+        
         // Create ZeroMQ bus
-        auto bus = create_zmq_bus();
+        auto bus = create_zmq_bus(logger.get(), zmq_config);
         
         // Build health query request
         Envelope req;
