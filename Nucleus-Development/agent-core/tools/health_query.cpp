@@ -4,6 +4,8 @@
 #include "agent/uuid.hpp"
 #include <iostream>
 #include <chrono>
+#include <mutex>
+#include <condition_variable>
 
 using namespace agent;
 
@@ -32,9 +34,32 @@ int main(int, char**) {
         std::cout << "  Topic: " << req.topic << "\n";
         std::cout << "  Correlation ID: " << req.correlation_id << "\n\n";
         
-        // Send request and wait for reply
+        // Subscribe to reply topic and wait for response
         Envelope reply;
-        bus->request(req, reply);
+        bool reply_received = false;
+        std::mutex reply_mutex;
+        std::condition_variable reply_cv;
+        
+        bus->subscribe("agent.health.query.reply", 
+            [&reply, &reply_received, &reply_mutex, &reply_cv, req_correlation_id = req.correlation_id]
+            (const Envelope& msg) {
+                if (msg.correlation_id == req_correlation_id) {
+                    std::lock_guard<std::mutex> lock(reply_mutex);
+                    reply = msg;
+                    reply_received = true;
+                    reply_cv.notify_one();
+                }
+            });
+        
+        // Publish the request
+        bus->publish(req);
+        
+        // Wait for reply (with timeout)
+        std::unique_lock<std::mutex> lock(reply_mutex);
+        if (!reply_cv.wait_for(lock, std::chrono::seconds(5), [&reply_received] { return reply_received; })) {
+            std::cerr << "Error: Timeout waiting for health query response\n";
+            return 1;
+        }
         
         std::cout << "Received health response:\n";
         std::cout << "  Topic: " << reply.topic << "\n";

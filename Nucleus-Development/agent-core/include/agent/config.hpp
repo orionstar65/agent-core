@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <cstdint>
 
 namespace agent {
 
@@ -88,6 +89,23 @@ struct Config {
         int health_check_interval_s{30};
         int crash_detection_interval_s{5};
     } extensions;
+    
+    struct Telemetry {
+        bool enabled{true};
+        int sampling_interval_s{30};        // How often to sample
+        int batch_size{10};                  // Readings per batch
+        int cache_max_batches{1000};          // Max cached batches
+        std::string cache_dir;                // Cache directory path
+        std::string modality{"CS"};           // Modality for MQTT topic (default: CS for gateway)
+        struct Alerts {
+            double cpu_warn_pct{80.0};
+            double cpu_critical_pct{95.0};
+            int64_t mem_warn_mb{400};
+            int64_t mem_critical_mb{480};
+            int64_t net_warn_kbps{200};
+            int64_t net_critical_kbps{240};
+        } alerts;
+    } telemetry;
 };
 
 std::unique_ptr<Config> load_config(const std::string& path);

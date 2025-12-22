@@ -36,6 +36,12 @@ struct ExtensionHealth {
     bool responding{false};
 };
 
+struct ProcessInfo {
+    int pid{0};
+    std::string executable_name;
+    std::string executable_path;
+};
+
 class ExtensionManager {
 public:
     virtual ~ExtensionManager() = default;
@@ -60,6 +66,9 @@ public:
     
     /// Get detailed health info for all extensions
     virtual std::map<std::string, ExtensionHealth> health_status() const = 0;
+    
+    /// Get process info for all running extensions
+    virtual std::map<std::string, ProcessInfo> get_process_info() const = 0;
 };
 
 // Create extension manager with configuration

@@ -62,15 +62,23 @@ int main(int argc, char* argv[]) {
     zmq::socket_t rep_socket(context, ZMQ_REP);
     
     // Use same platform detection as bus implementation
+    // If req_port is provided (not default), use TCP on both platforms for consistency
+    // Otherwise use platform defaults (TCP on Windows, IPC on Linux)
     std::string rep_endpoint;
+    int default_port = 5556;  // Default port matching bus default
+    if (req_port != default_port) {
+        // Non-default port provided - use TCP on both platforms for test compatibility
+        rep_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port);
+    } else {
 #ifdef _WIN32
-    // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
-    rep_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port);
+        // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+        rep_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port);
 #else
-    // Linux: Use /tmp/ directory for IPC
-    // Note: Uses same fixed path as bus implementation; IPC sockets auto-cleanup on process exit
-    rep_endpoint = "ipc:///tmp/agent-bus-req";
+        // Linux: Use /tmp/ directory for IPC (default behavior)
+        // Note: Uses same fixed path as bus implementation; IPC sockets auto-cleanup on process exit
+        rep_endpoint = "ipc:///tmp/agent-bus-req";
 #endif
+    }
     
     try {
         rep_socket.bind(rep_endpoint);

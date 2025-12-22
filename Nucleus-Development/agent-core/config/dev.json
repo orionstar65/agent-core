@@ -63,5 +63,21 @@
     "quarantineDurationS": 300,
     "healthCheckIntervalS": 30,
     "crashDetectionIntervalS": 5
+  },
+  "telemetry": {
+    "enabled": true,
+    "samplingIntervalS": 30,
+    "batchSize": 10,
+    "cacheMaxBatches": 1000,
+    "cacheDir": "./telemetry_cache",
+    "modality": "CS",
+    "alerts": {
+      "cpuWarnPct": 80.0,
+      "cpuCriticalPct": 95.0,
+      "memWarnMB": 400,
+      "memCriticalMB": 480,
+      "netWarnKBps": 200,
+      "netCriticalKBps": 240
+    }
   }
 }

@@ -25,6 +25,8 @@ set(AGENT_LIB_SOURCES
     ../src/telemetry/logging.cpp
     ../src/telemetry/metrics.cpp
     ../src/telemetry/log_throttler.cpp
+    ../src/telemetry/telemetry_collector.cpp
+    ../src/telemetry/telemetry_cache.cpp
 )
 
 # Platform-specific sources
@@ -286,6 +288,19 @@ if(WIN32)
     target_link_libraries(test_health_format PRIVATE ws2_32)
 else()
     target_link_libraries(test_health_format PRIVATE pthread)
+# Integration test for Telemetry
+add_executable(test_telemetry
+    integration/test_telemetry.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_telemetry PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_telemetry PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_telemetry PRIVATE ws2_32)
+else()
+    target_link_libraries(test_telemetry PRIVATE pthread)
 endif()
 
 # Register tests with CTest and set working directory
@@ -303,6 +318,7 @@ add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECT
 add_test(NAME ExtensionManagerUnitTest COMMAND test_extension_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ExtensionLifecycleIntegrationTest COMMAND test_extension_lifecycle WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME HealthFormatUnitTest COMMAND test_health_format WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME TelemetryIntegrationTest COMMAND test_telemetry WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full
 # Run manually with: sudo ./build/tests/test_service_installer --full

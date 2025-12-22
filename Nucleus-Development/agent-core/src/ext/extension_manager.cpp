@@ -6,6 +6,8 @@
 #include <limits.h>
 #include <cerrno>
 #include <thread>
+#include <fstream>
+#include <sstream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -32,6 +34,7 @@ struct ExtensionState {
     std::chrono::steady_clock::time_point last_health_ping;
     std::chrono::steady_clock::time_point crash_time;
     std::chrono::steady_clock::time_point quarantine_start_time;
+    std::chrono::steady_clock::time_point scheduled_restart_time;  // When to restart after crash (async delay)
     bool responding{false};
 };
 
@@ -68,12 +71,30 @@ public:
                     now - ext.quarantine_start_time).count();
                 if (duration >= config_.quarantine_duration_s) {
                     ext.restart_count = 0;
+                    // Save reset restart_count to map before launch_single, which will read from map
+                    extensions_[name] = ext;
                     launch_single(ext.spec);
                 }
                 continue;
             }
 
+            // Check if scheduled restart time has arrived
+            // Only check if scheduled_restart_time was set (not default-initialized epoch)
+            // We verify this by checking if scheduled_restart_time is after crash_time
+            if (ext.state == ExtState::Crashed && 
+                ext.scheduled_restart_time > ext.crash_time &&
+                now >= ext.scheduled_restart_time) {
+                // Time to restart - perform the restart now
+                ext.last_restart_time = now;
+                // Save last_restart_time to map before launch_single, which will read from map
+                extensions_[name] = ext;
+                launch_single(ext.spec);
+                continue;
+            }
+
             if (!is_alive(ext)) {
+                // Reap zombie process before handling crash
+                reap_zombie(ext);
                 ext.state = ExtState::Crashed;
                 ext.crash_time = now;
                 handle_crash(ext);
@@ -115,6 +136,44 @@ public:
         }
         return result;
     }
+    
+    std::map<std::string, ProcessInfo> get_process_info() const override {
+        std::map<std::string, ProcessInfo> info_map;
+        
+        for (const auto& [name, ext] : extensions_) {
+            if (ext.state == ExtState::Running && ext.pid > 0) {
+                ProcessInfo info;
+                info.pid = static_cast<int>(ext.pid);
+                info.executable_path = ext.spec.exec_path;
+                
+                // Extract executable name from path
+                std::string path = ext.spec.exec_path;
+#ifdef _WIN32
+                size_t pos = path.find_last_of("\\/");
+                if (pos != std::string::npos) {
+                    info.executable_name = path.substr(pos + 1);
+                } else {
+                    info.executable_name = path;
+                }
+                // Remove .exe extension if present
+                if (info.executable_name.size() > 4 && 
+                    info.executable_name.substr(info.executable_name.size() - 4) == ".exe") {
+                    info.executable_name = info.executable_name.substr(0, info.executable_name.size() - 4);
+                }
+#else
+                size_t pos = path.find_last_of("/");
+                if (pos != std::string::npos) {
+                    info.executable_name = path.substr(pos + 1);
+                } else {
+                    info.executable_name = path;
+                }
+#endif
+                info_map[name] = info;
+            }
+        }
+        
+        return info_map;
+    }
 
 private:
     Config::Extensions config_;
@@ -126,9 +185,18 @@ private:
         ExtensionState ext;
         if (it != extensions_.end()) {
             ext = it->second;  // Preserve existing state including restart_count
+#ifdef _WIN32
+            // Close old process handle before overwriting with new one to prevent handle leak
+            if (ext.handle != nullptr && ext.handle != INVALID_HANDLE_VALUE) {
+                CloseHandle(ext.handle);
+                ext.handle = nullptr;
+            }
+#endif
         } else {
             ext.spec = spec;
         }
+        // Always update spec to reflect current specification (may have changed args, etc.)
+        ext.spec = spec;
         ext.state = ExtState::Starting;
 
 #ifdef _WIN32
@@ -202,20 +270,46 @@ private:
 #else
         if (ext.pid <= 0) return false;
         
-        // Use waitpid with WNOHANG to check if process has exited
-        // This also reaps zombie processes
+        // Use kill(pid, 0) to check if process exists without reaping zombies
+        // This is non-destructive and can be called safely by both health_ping() and monitor()
+        if (kill(ext.pid, 0) != 0) {
+            // Process doesn't exist (errno will be ESRCH)
+            return false;
+        }
+        
+        // Process exists, but could be a zombie. Check /proc/{pid}/stat to see state
+        // State is the 3rd field in /proc/{pid}/stat
+        std::string stat_path = "/proc/" + std::to_string(ext.pid) + "/stat";
+        std::ifstream stat_file(stat_path);
+        if (!stat_file) {
+            // Can't read stat file, assume process is dead
+            return false;
+        }
+        
+        // Read the stat file to get process state
+        std::string line;
+        std::getline(stat_file, line);
+        std::istringstream iss(line);
+        std::string pid_str, comm, state;
+        iss >> pid_str >> comm >> state;
+        
+        // State 'Z' means zombie, any other state means process is alive
+        // (R=running, S=sleeping, D=disk sleep, etc.)
+        return state != "Z";
+#endif
+    }
+    
+    // Separate function to reap zombie processes (only called when we know process is dead)
+    void reap_zombie(ExtensionState& ext) {
+#ifndef _WIN32
+        if (ext.pid <= 0) return;
+        
+        // Reap zombie process if it exists
         int status;
         pid_t result = waitpid(ext.pid, &status, WNOHANG);
-        
-        if (result == 0) {
-            // Process still running
-            return true;
-        } else if (result == ext.pid) {
-            // Process has exited (zombie reaped)
-            return false;
-        } else {
-            // Error (probably no such process)
-            return false;
+        if (result == ext.pid) {
+            // Zombie was reaped
+            ext.pid = 0;
         }
 #endif
     }
@@ -232,14 +326,22 @@ private:
             extensions_[ext.spec.name] = ext;
             return;
         }
-        // Save incremented restart_count to map before restart
+        // Save incremented restart_count to map before scheduling restart
         extensions_[ext.spec.name] = ext;
         
+        // calculate_backoff_with_jitter expects 0-based attempt number
+        // restart_count is 1-based (1 = first crash, 2 = second crash, etc.)
+        // So we pass restart_count - 1 (0 = first restart attempt, 1 = second restart attempt, etc.)
         int delay = calculate_backoff_with_jitter(
-            ext.restart_count, config_.restart_base_delay_ms, config_.restart_max_delay_ms, 20);
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-        ext.last_restart_time = std::chrono::steady_clock::now();
-        launch_single(ext.spec);
+            ext.restart_count - 1, config_.restart_base_delay_ms, config_.restart_max_delay_ms, 20);
+        
+        // Schedule restart time asynchronously instead of blocking
+        // monitor() will check this time and perform the restart when ready
+        ext.scheduled_restart_time = std::chrono::steady_clock::now() + 
+            std::chrono::milliseconds(delay);
+        
+        // Save scheduled restart time to map
+        extensions_[ext.spec.name] = ext;
     }
 };
 

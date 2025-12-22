@@ -216,7 +216,49 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             }
         }
         
-        return config;
+        // Parse Telemetry
+        if (j.contains("telemetry")) {
+            auto& telemetry = j["telemetry"];
+            if (telemetry.contains("enabled")) {
+                config->telemetry.enabled = telemetry["enabled"].get<bool>();
+            }
+            if (telemetry.contains("samplingIntervalS")) {
+                config->telemetry.sampling_interval_s = telemetry["samplingIntervalS"].get<int>();
+            }
+            if (telemetry.contains("batchSize")) {
+                config->telemetry.batch_size = telemetry["batchSize"].get<int>();
+            }
+            if (telemetry.contains("cacheMaxBatches")) {
+                config->telemetry.cache_max_batches = telemetry["cacheMaxBatches"].get<int>();
+            }
+            if (telemetry.contains("cacheDir")) {
+                config->telemetry.cache_dir = telemetry["cacheDir"].get<std::string>();
+            }
+            if (telemetry.contains("modality")) {
+                config->telemetry.modality = telemetry["modality"].get<std::string>();
+            }
+            if (telemetry.contains("alerts")) {
+                auto& alerts = telemetry["alerts"];
+                if (alerts.contains("cpuWarnPct")) {
+                    config->telemetry.alerts.cpu_warn_pct = alerts["cpuWarnPct"].get<double>();
+                }
+                if (alerts.contains("cpuCriticalPct")) {
+                    config->telemetry.alerts.cpu_critical_pct = alerts["cpuCriticalPct"].get<double>();
+                }
+                if (alerts.contains("memWarnMB")) {
+                    config->telemetry.alerts.mem_warn_mb = alerts["memWarnMB"].get<int64_t>();
+                }
+                if (alerts.contains("memCriticalMB")) {
+                    config->telemetry.alerts.mem_critical_mb = alerts["memCriticalMB"].get<int64_t>();
+                }
+                if (alerts.contains("netWarnKBps")) {
+                    config->telemetry.alerts.net_warn_kbps = alerts["netWarnKBps"].get<int64_t>();
+                }
+                if (alerts.contains("netCriticalKBps")) {
+                    config->telemetry.alerts.net_critical_kbps = alerts["netCriticalKBps"].get<int64_t>();
+                }
+            }
+        }
         
         std::cout << "Config loaded successfully from: " << path << "\n";
         std::cout << "  Backend URL: " << config->backend.base_url << "\n";
