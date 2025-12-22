@@ -47,13 +47,31 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     
+    // Parse command line arguments for ZeroMQ configuration
+    int req_port = 5556;  // Default port matching bus default
     for (int i = 1; i < argc; i++) {
-        log("DEBUG", "Arg[" + std::to_string(i) + "]:", argv[i]);
+        std::string arg = argv[i];
+        if (arg == "--req-port" && i + 1 < argc) {
+            req_port = std::stoi(argv[++i]);
+        } else {
+            log("DEBUG", "Arg[" + std::to_string(i) + "]:", argv[i]);
+        }
     }
     
     zmq::context_t context(1);
     zmq::socket_t rep_socket(context, ZMQ_REP);
-    std::string rep_endpoint = "ipc:///tmp/agent-bus-req";
+    
+    // Use same platform detection as bus implementation
+    std::string rep_endpoint;
+#ifdef _WIN32
+    // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
+    rep_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port);
+#else
+    // Linux: Use /tmp/ directory for IPC
+    // Note: Uses same fixed path as bus implementation; IPC sockets auto-cleanup on process exit
+    rep_endpoint = "ipc:///tmp/agent-bus-req";
+#endif
+    
     try {
         rep_socket.bind(rep_endpoint);
     } catch (const zmq::error_t& e) {

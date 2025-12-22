@@ -100,18 +100,6 @@ Key configuration sections:
   - `throttle.enabled`: Enable/disable error throttling (default: true)
   - `throttle.errorThreshold`: Number of errors before throttling activates (default: 10)
   - `throttle.windowSeconds`: Time window for error counting (default: 60)
-- `zmq`: ZeroMQ bus configuration (ports, optional CURVE encryption)
-
-### Identity Discovery
-
-Agent Core discovers device identity using a priority-based approach:
-
-1. **Config Override** (highest priority) - Values explicitly set in config file
-2. **Windows Registry** (Windows only) - Reads from `HKLM\SOFTWARE\AgentCore\Identity`
-3. **identity.json** - JSON file fallback (searched in executable directory or current working directory)
-4. **System Discovery** - Falls back to hostname/machine-id
-
-For gateway mode (`isGateway=true`), if standard identity fields are missing, a UUID is automatically generated as the unique identifier.
 
 ### Authentication
 

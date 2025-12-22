@@ -8,26 +8,47 @@
 #include <chrono>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <direct.h>
+#include <errno.h>
+#else
+#include <unistd.h>
+#endif
 
 using namespace agent;
 
+#ifdef _WIN32
+const std::string TEST_STATE_DIR = "C:\\temp\\agent-restart-test";
+#else
 const std::string TEST_STATE_DIR = "/tmp/agent-restart-test";
+#endif
 const std::string TEST_STATE_FILE = TEST_STATE_DIR + "/restart-state.json";
 
 void cleanup_test_state() {
     std::remove(TEST_STATE_FILE.c_str());
+#ifdef _WIN32
+    _rmdir(TEST_STATE_DIR.c_str());
+#else
     rmdir(TEST_STATE_DIR.c_str());
+#endif
 }
 
 void ensure_state_dir() {
 #ifdef _WIN32
-#ifdef _MSC_VER
-    _mkdir(TEST_STATE_DIR.c_str());
+    if (_mkdir(TEST_STATE_DIR.c_str()) != 0 && errno != EEXIST) {
+        // Try to create parent directory if it doesn't exist
+        std::string parent = TEST_STATE_DIR.substr(0, TEST_STATE_DIR.find_last_of("\\/"));
+        if (!parent.empty()) {
+            _mkdir(parent.c_str());
+            _mkdir(TEST_STATE_DIR.c_str());
+        }
+    }
 #else
-    mkdir(TEST_STATE_DIR.c_str());
-#endif
-#else
-    mkdir(TEST_STATE_DIR.c_str(), 0755);
+    if (mkdir(TEST_STATE_DIR.c_str(), 0755) != 0 && errno != EEXIST) {
+        // Directory creation failed and it's not because it already exists
+        std::cerr << "Failed to create test directory: " << TEST_STATE_DIR << "\n";
+    }
 #endif
 }
 

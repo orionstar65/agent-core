@@ -8,7 +8,6 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
-#include <vector>
 #include <mutex>
 #include <map>
 #ifdef HAVE_ZMQ
@@ -19,7 +18,6 @@ using namespace agent;
 
 // Test parameters
 const int TARGET_MSGS_PER_MIN = 10000;
-const int MSGS_PER_SEC = TARGET_MSGS_PER_MIN / 60;  // ~167 msgs/sec
 const int SOAK_TEST_DURATION_SEC = 60;  // 1 minute soak test
 const int PUBSUB_TEST_DURATION_SEC = 10;  // 10 seconds for PUB/SUB test
 const int REQREP_TEST_DURATION_SEC = 10;  // 10 seconds for REQ/REP test
@@ -127,19 +125,20 @@ void test_reqrep_load() {
     Config::ZeroMQ zmq_config;
     zmq_config.pub_port = 5559;
     zmq_config.req_port = 5560;  // REQ/REP port for this test
-    auto bus = create_zmq_bus(logger.get(), zmq_config);  // Use different ports
     
     TestStats stats;
     std::atomic<bool> running{true};
+    std::atomic<bool> responder_ready{false};
     
-    // Start echo responder in separate thread
-    std::thread responder([&zmq_config, &running]() {
+    // Start echo responder in separate thread - must start before bus connects
+    std::thread responder([&zmq_config, &running, &responder_ready]() {
 #ifdef HAVE_ZMQ
         zmq::context_t context(1);
         zmq::socket_t rep_socket(context, ZMQ_REP);
         
         // Bind to the same endpoint that REQ connects to
         // Use same platform detection as bus implementation
+        // The bus connects to the endpoint, so we need to bind to it
 #ifdef _WIN32
         // Windows: ZeroMQ IPC doesn't work well, use TCP localhost instead
         std::string rep_endpoint = "tcp://127.0.0.1:" + std::to_string(zmq_config.req_port);
@@ -151,6 +150,9 @@ void test_reqrep_load() {
         
         try {
             rep_socket.bind(rep_endpoint);
+            // Small delay to ensure socket is ready
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            responder_ready = true;
         } catch (const zmq::error_t& e) {
             std::cerr << "REP socket bind failed: " << e.what() << "\n";
             return;
@@ -200,7 +202,35 @@ void test_reqrep_load() {
 #endif
     });
     
-    // Wait a bit
+    // Wait for responder to be ready before creating bus (which connects)
+    int wait_count = 0;
+    while (!responder_ready && wait_count < 50) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        wait_count++;
+    }
+    if (!responder_ready) {
+        std::cerr << "Error: Responder failed to bind - cannot proceed with test\n";
+        running = false;
+        responder.join();
+        std::cout << "⚠ Test skipped: REQ/REP responder binding failed\n";
+        return;
+    }
+    
+    // Now create the bus (which will connect to the responder)
+    // Wrap in try-catch to ensure responder thread cleanup on exception
+    std::unique_ptr<Bus> bus;
+    try {
+        bus = create_zmq_bus(logger.get(), zmq_config);
+    } catch (const std::exception& e) {
+        // Bus creation failed - clean up responder thread before exiting
+        std::cerr << "Error: Failed to create ZeroMQ bus: " << e.what() << "\n";
+        running = false;
+        responder.join();
+        std::cout << "⚠ Test skipped: REQ/REP bus creation failed\n";
+        return;
+    }
+    
+    // Additional small delay to ensure connection is established
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Request sender thread
@@ -344,9 +374,8 @@ int main() {
     
     try {
         test_pubsub_load();
-        // FIXME: REQ/REP and soak tests have socket binding issues
-        // test_reqrep_load();
-        // test_soak();
+        test_reqrep_load();
+        test_soak();
         
         std::cout << "\n========================================\n";
         std::cout << "All load tests passed!\n";

@@ -13,12 +13,6 @@
 #include <limits.h>
 #endif
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
 using json = nlohmann::json;
 
 namespace agent {
@@ -225,12 +219,10 @@ Identity discover_identity(const Config& config) {
         // Ignore if we can't get current path
     }
     
-    bool json_read = false;
     for (const auto& dir : search_dirs) {
         if (!has_identity_data) {
             // No registry data - read all fields from JSON
             if (read_identity_from_json(dir, identity)) {
-                json_read = true;
                 std::cout << "Identity from identity.json (in " << dir << "):\n";
                 if (!identity.serial_number.empty()) {
                     std::cout << "  Serial Number: " << identity.serial_number << "\n";
@@ -255,7 +247,6 @@ Identity discover_identity(const Config& config) {
             // Registry provided data - read JSON separately just for tunnel info and isGateway
             Identity json_identity;
             if (read_identity_from_json(dir, json_identity)) {
-                json_read = true;
                 identity.tunnel_info = json_identity.tunnel_info;
                 if (json_identity.is_gateway) {
                     identity.is_gateway = json_identity.is_gateway;
