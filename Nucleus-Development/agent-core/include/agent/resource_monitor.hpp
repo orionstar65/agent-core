@@ -34,6 +34,14 @@ public:
     
     // Check if usage exceeds budgets
     virtual bool exceeds_budget(const ResourceUsage& usage, const Config& config) const = 0;
+    
+    // Throttling controls
+    virtual bool set_cpu_priority(int pid, int priority) const = 0;
+    virtual bool set_memory_limit(int pid, int64_t max_mb) const = 0;
+    virtual bool reset_limits(int pid) const = 0;
+    
+    // Aggregate usage tracking
+    virtual ResourceUsage aggregate_usage(const std::vector<int>& pids) const = 0;
 };
 
 // create default implementation

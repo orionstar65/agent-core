@@ -35,15 +35,27 @@ public:
 #ifdef _WIN32
         if (_mkdir(parent_dir.c_str()) != 0 && errno != EEXIST) {
             // Try creating parent directories recursively
-            // Build up the path incrementally, excluding separators (consistent with Linux)
+            // Build up the path incrementally
             size_t pos = 0;
-            while ((pos = parent_dir.find_first_of("/\\", pos + 1)) != std::string::npos) {
+            // Start from position 0 to find all separators correctly
+            while ((pos = parent_dir.find_first_of("/\\", pos)) != std::string::npos) {
                 // Extract directory up to but not including the separator
-                // For "C:\\temp\\agent", this creates "C:" first, then "C:\\temp"
                 std::string subdir = parent_dir.substr(0, pos);
-                if (!subdir.empty() && _mkdir(subdir.c_str()) != 0 && errno != EEXIST) {
-                    // Continue trying - some directories may already exist
+                // Skip invalid directory names:
+                // 1. Single drive letter without colon (e.g., "C")
+                // 2. Drive letter with colon (e.g., "C:") - drive root already exists
+                // Only create directories that are actual path components
+                bool is_single_drive_letter = (subdir.length() == 1 && 
+                    ((subdir[0] >= 'A' && subdir[0] <= 'Z') || 
+                     (subdir[0] >= 'a' && subdir[0] <= 'z')));
+                bool is_drive_root = (subdir.length() == 2 && subdir[1] == ':');
+                
+                if (!subdir.empty() && !is_single_drive_letter && !is_drive_root) {
+                    if (_mkdir(subdir.c_str()) != 0 && errno != EEXIST) {
+                        // Continue trying - some directories may already exist
+                    }
                 }
+                pos++; // Move past the separator for next iteration
             }
             // Try creating the final directory again
             if (_mkdir(parent_dir.c_str()) != 0 && errno != EEXIST) {

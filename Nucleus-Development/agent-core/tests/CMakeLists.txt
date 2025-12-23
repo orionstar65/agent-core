@@ -18,6 +18,7 @@ set(AGENT_LIB_SOURCES
     ../src/ext/extension_manager.cpp
     ../src/ext/extension_manifest.cpp
     ../src/res/resource_monitor.cpp
+    ../src/res/quota_enforcer.cpp
     ../src/service/restart_manager.cpp
     ../src/service/restart_state_store.cpp
     ../src/util/retry.cpp
@@ -52,7 +53,7 @@ target_include_directories(test_auth PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_auth PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_auth PRIVATE ws2_32)
+    target_link_libraries(test_auth PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_auth PRIVATE pthread)
 endif()
@@ -79,7 +80,7 @@ if(ZMQ_FOUND)
 endif()
 
 if(WIN32)
-    target_link_libraries(test_zmq PRIVATE ws2_32)
+    target_link_libraries(test_zmq PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_zmq PRIVATE pthread)
 endif()
@@ -105,7 +106,7 @@ if(ZMQ_FOUND)
 endif()
 
 if(WIN32)
-    target_link_libraries(test_zmq_load PRIVATE ws2_32)
+    target_link_libraries(test_zmq_load PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_zmq_load PRIVATE pthread)
 endif()
@@ -120,7 +121,7 @@ target_include_directories(test_ssm_registration PRIVATE ${CMAKE_SOURCE_DIR}/inc
 target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_ssm_registration PRIVATE ws2_32)
+    target_link_libraries(test_ssm_registration PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_ssm_registration PRIVATE pthread)
 endif()
@@ -135,7 +136,7 @@ target_include_directories(test_identity PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_identity PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_identity PRIVATE ws2_32)
+    target_link_libraries(test_identity PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_identity PRIVATE pthread)
 endif()
@@ -150,7 +151,7 @@ target_include_directories(test_restart_manager PRIVATE ${CMAKE_SOURCE_DIR}/incl
 target_link_libraries(test_restart_manager PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_restart_manager PRIVATE ws2_32)
+    target_link_libraries(test_restart_manager PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_restart_manager PRIVATE pthread)
 endif()
@@ -165,7 +166,7 @@ target_include_directories(test_logging PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_logging PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_logging PRIVATE ws2_32)
+    target_link_libraries(test_logging PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_logging PRIVATE pthread)
 endif()
@@ -180,7 +181,7 @@ target_include_directories(test_log_throttler PRIVATE ${CMAKE_SOURCE_DIR}/includ
 target_link_libraries(test_log_throttler PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_log_throttler PRIVATE ws2_32)
+    target_link_libraries(test_log_throttler PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_log_throttler PRIVATE pthread)
 endif()
@@ -195,9 +196,24 @@ target_include_directories(test_retry_metrics PRIVATE ${CMAKE_SOURCE_DIR}/includ
 target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_retry_metrics PRIVATE ws2_32)
+    target_link_libraries(test_retry_metrics PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_retry_metrics PRIVATE pthread)
+endif()
+
+# Unit test for Quota Enforcer
+add_executable(test_quota_enforcer
+    unit/test_quota_enforcer.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_quota_enforcer PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_quota_enforcer PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_quota_enforcer PRIVATE ws2_32 psapi iphlpapi)
+else()
+    target_link_libraries(test_quota_enforcer PRIVATE pthread)
 endif()
 
 # Integration test for Restart/Quarantine
@@ -210,7 +226,7 @@ target_include_directories(test_restart_quarantine PRIVATE ${CMAKE_SOURCE_DIR}/i
 target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_restart_quarantine PRIVATE ws2_32)
+    target_link_libraries(test_restart_quarantine PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_restart_quarantine PRIVATE pthread)
 endif()
@@ -225,7 +241,7 @@ target_include_directories(test_service_installer PRIVATE ${CMAKE_SOURCE_DIR}/in
 target_link_libraries(test_service_installer PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_service_installer PRIVATE ws2_32)
+    target_link_libraries(test_service_installer PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_service_installer PRIVATE pthread)
 endif()
@@ -240,7 +256,7 @@ target_include_directories(test_logging_throttling PRIVATE ${CMAKE_SOURCE_DIR}/i
 target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_logging_throttling PRIVATE ws2_32)
+    target_link_libraries(test_logging_throttling PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_logging_throttling PRIVATE pthread)
 endif()
@@ -298,7 +314,7 @@ target_include_directories(test_telemetry PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_telemetry PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_telemetry PRIVATE ws2_32)
+    target_link_libraries(test_telemetry PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_telemetry PRIVATE pthread)
 endif()
@@ -308,6 +324,7 @@ add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECT
 add_test(NAME LoggingUnitTest COMMAND test_logging WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME LogThrottlerUnitTest COMMAND test_log_throttler WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME RetryMetricsUnitTest COMMAND test_retry_metrics WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME QuotaEnforcerUnitTest COMMAND test_quota_enforcer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME RestartQuarantineIntegrationTest COMMAND test_restart_quarantine WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME IdentityDiscoveryTest COMMAND test_identity WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

@@ -30,7 +30,7 @@ std::vector<ExtensionSpec> load_extension_manifest(const std::string& manifest_p
             spec.name = ext.value("name", "");
             spec.exec_path = ext.value("execPath", "");
             spec.critical = ext.value("critical", true);
-            spec.enabled = ext.value("enabled", false);
+            spec.enabled = ext.value("enabled", true);
             
             if (ext.contains("args") && ext["args"].is_array()) {
                 for (const auto& arg : ext["args"]) {

@@ -49,6 +49,7 @@ set(AGENT_CORE_SOURCES
     src/ext/extension_manager.cpp
     src/ext/extension_manifest.cpp
     src/res/resource_monitor.cpp
+    src/res/quota_enforcer.cpp
     src/service/restart_manager.cpp
     src/service/restart_state_store.cpp
     src/util/retry.cpp
@@ -81,7 +82,7 @@ target_link_libraries(agent-core PRIVATE CURL::libcurl)
 
 # Platform-specific libraries
 if(WIN32)
-    target_link_libraries(agent-core PRIVATE ws2_32)
+    target_link_libraries(agent-core PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(agent-core PRIVATE pthread)
 endif()

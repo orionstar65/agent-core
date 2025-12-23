@@ -5,11 +5,13 @@
 #include <sstream>
 #include <algorithm>
 #include <thread>
+#include <cctype>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
 #include <iphlpapi.h>
+#include <tlhelp32.h>
 #pragma comment(lib, "psapi.lib")
 #pragma comment(lib, "iphlpapi.lib")
 #else
@@ -41,9 +43,19 @@ public:
     ~ResourceMonitorImpl() = default;
     
     ResourceUsage sample(const std::string& process_name) const override {
-        // Try to find PID by process name (simplified - would need process enumeration)
-        // For now, delegate to sample_by_pid with current process
-        return sample_by_pid(get_current_pid());
+        // Special case: "agent-core" refers to the current process
+        if (process_name == "agent-core") {
+            return sample_by_pid(get_current_pid());
+        }
+        
+        // Find PID by process name
+        int pid = find_pid_by_name(process_name);
+        if (pid > 0) {
+            return sample_by_pid(pid);
+        }
+        
+        // Process not found - return empty usage
+        return ResourceUsage();
     }
     
     ResourceUsage sample_by_pid(int pid) const override {
@@ -130,20 +142,42 @@ public:
         }
         
         // CPU from /proc/pid/stat
+        // Format: pid (comm) state ppid pgrp session tty_nr tpgid flags minflt cminflt majflt cmajflt utime stime ...
+        // The comm field (field 2) is in parentheses and can contain spaces, so we need special parsing
         std::ifstream stat_file(proc_path + "/stat");
         if (stat_file.is_open()) {
             std::string line;
             std::getline(stat_file, line);
-            std::istringstream iss(line);
-            std::vector<std::string> tokens;
-            std::string token;
-            while (iss >> token) {
-                tokens.push_back(token);
-            }
-            if (tokens.size() >= 15) {
-                uint64_t utime = std::stoull(tokens[13]);
-                uint64_t stime = std::stoull(tokens[14]);
-                uint64_t total_time = utime + stime;
+            
+            // Find the command name in parentheses (field 2)
+            size_t paren_start = line.find('(');
+            size_t paren_end = line.find(')', paren_start);
+            
+            if (paren_start != std::string::npos && paren_end != std::string::npos) {
+                // Extract fields before command name (pid)
+                std::string pid_str = line.substr(0, paren_start);
+                // Trim whitespace from pid_str
+                while (!pid_str.empty() && std::isspace(pid_str.back())) {
+                    pid_str.pop_back();
+                }
+                // Skip the command name and closing paren, then parse remaining fields
+                std::string remaining = line.substr(paren_end + 1);
+                // Trim leading whitespace from remaining
+                while (!remaining.empty() && std::isspace(remaining.front())) {
+                    remaining.erase(0, 1);
+                }
+                std::istringstream iss(remaining);
+                
+                // Now parse: state ppid pgrp session tty_nr tpgid flags minflt cminflt majflt cmajflt utime stime ...
+                std::string state, ppid, pgrp, session, tty_nr, tpgid, flags;
+                std::string minflt, cminflt, majflt, cmajflt, utime_str, stime_str;
+                iss >> state >> ppid >> pgrp >> session >> tty_nr >> tpgid >> flags;
+                iss >> minflt >> cminflt >> majflt >> cmajflt >> utime_str >> stime_str;
+                
+                if (!utime_str.empty() && !stime_str.empty()) {
+                    uint64_t utime = std::stoull(utime_str);
+                    uint64_t stime = std::stoull(stime_str);
+                    uint64_t total_time = utime + stime;
                 
                 auto now = std::chrono::steady_clock::now();
                 auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -166,6 +200,7 @@ public:
                 }
                 
                 prev_cpu_times_[pid] = std::make_pair(now_ms, total_time);
+                }
             }
             stat_file.close();
         }
@@ -226,9 +261,30 @@ public:
         // System CPU (simplified - would use PDH for accurate measurement)
         usage.cpu_pct = 0.0; // Placeholder
         
-        // System network and disk would require WMI
-        usage.net_in_kbps = 0;
-        usage.net_out_kbps = 0;
+        // System network - use GetIpStatisticsEx for basic stats
+        MIB_IPSTATS ip_stats;
+        if (GetIpStatisticsEx(&ip_stats, AF_INET) == NO_ERROR) {
+            // Calculate rate over time window
+            auto now = std::chrono::steady_clock::now();
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()).count();
+            
+            // Note: GetIpStatisticsEx doesn't provide byte counts directly
+            // For a more accurate implementation, we'd use GetIfTable/GetIfEntry
+            // For now, we'll use a simplified approach
+            if (prev_net_time_ > 0) {
+                int64_t elapsed_ms = now_ms - prev_net_time_;
+                // Placeholder: would need to track actual bytes from interfaces
+                usage.net_in_kbps = 0;
+                usage.net_out_kbps = 0;
+            }
+            
+            prev_net_time_ = now_ms;
+        } else {
+            usage.net_in_kbps = 0;
+            usage.net_out_kbps = 0;
+        }
+        
         usage.disk_read_mb = 0;
         usage.disk_write_mb = 0;
         usage.handles = 0;
@@ -312,9 +368,27 @@ public:
             }
             net_file.close();
             
-            // Calculate rate (simplified - would need previous values for accurate rate)
-            usage.net_in_kbps = 0;  // Placeholder
-            usage.net_out_kbps = 0; // Placeholder
+            // Calculate rate over time window
+            auto now = std::chrono::steady_clock::now();
+            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now.time_since_epoch()).count();
+            
+            if (prev_net_time_ > 0 && prev_net_rx_bytes_ > 0 && prev_net_tx_bytes_ > 0) {
+                int64_t elapsed_ms = now_ms - prev_net_time_;
+                if (elapsed_ms > 0) {
+                    uint64_t rx_diff = rx_bytes - prev_net_rx_bytes_;
+                    uint64_t tx_diff = tx_bytes - prev_net_tx_bytes_;
+                    
+                    // Convert bytes to KB and calculate rate per second
+                    double elapsed_sec = elapsed_ms / 1000.0;
+                    usage.net_in_kbps = static_cast<int64_t>((rx_diff / 1024.0) / elapsed_sec);
+                    usage.net_out_kbps = static_cast<int64_t>((tx_diff / 1024.0) / elapsed_sec);
+                }
+            }
+            
+            prev_net_rx_bytes_ = rx_bytes;
+            prev_net_tx_bytes_ = tx_bytes;
+            prev_net_time_ = now_ms;
         }
         
         usage.disk_read_mb = 0;
@@ -349,6 +423,115 @@ public:
         
         return exceeds;
     }
+    
+    bool set_cpu_priority(int pid, int priority) const override {
+        if (pid <= 0) return false;
+        
+#ifdef _WIN32
+        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, pid);
+        if (!hProcess) {
+            return false;
+        }
+        
+        DWORD priority_class;
+        // priority: 0 = normal, 1 = below normal, 2 = idle
+        if (priority == 0) {
+            priority_class = NORMAL_PRIORITY_CLASS;
+        } else if (priority == 1) {
+            priority_class = BELOW_NORMAL_PRIORITY_CLASS;
+        } else {
+            priority_class = IDLE_PRIORITY_CLASS;
+        }
+        
+        bool result = SetPriorityClass(hProcess, priority_class) != 0;
+        CloseHandle(hProcess);
+        return result;
+#else
+        // Linux: nice values (higher = lower priority)
+        // priority: 0 = normal (nice 0), 1 = below normal (nice 5), 2 = idle (nice 19)
+        int nice_value = 0;
+        if (priority == 1) {
+            nice_value = 5;
+        } else if (priority >= 2) {
+            nice_value = 19;
+        }
+        
+        return setpriority(PRIO_PROCESS, pid, nice_value) == 0;
+#endif
+    }
+    
+    bool set_memory_limit(int pid, int64_t max_mb) const override {
+        if (pid <= 0 || max_mb <= 0) return false;
+        
+#ifdef _WIN32
+        // Windows: Use Job Objects for memory limits
+        // Note: This requires creating a job object and assigning the process to it
+        // For simplicity, we'll use SetProcessWorkingSetSize as a soft limit
+        HANDLE hProcess = OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION, FALSE, pid);
+        if (!hProcess) {
+            return false;
+        }
+        
+        SIZE_T min_ws = 0;
+        SIZE_T max_ws = static_cast<SIZE_T>(max_mb * 1024 * 1024);
+        bool result = SetProcessWorkingSetSize(hProcess, min_ws, max_ws) != 0;
+        CloseHandle(hProcess);
+        return result;
+#else
+        // Linux: Use setrlimit
+        struct rlimit rl;
+        if (getrlimit(RLIMIT_AS, &rl) != 0) {
+            return false;
+        }
+        
+        rl.rlim_cur = static_cast<rlim_t>(max_mb * 1024 * 1024);
+        rl.rlim_max = static_cast<rlim_t>(max_mb * 1024 * 1024);
+        
+        // Note: setrlimit requires the process to call it on itself or have appropriate privileges
+        // For external processes, we'd need to use prlimit (if available) or cgroups
+        // For now, return false as we can't set limits on other processes easily
+        return false;
+#endif
+    }
+    
+    bool reset_limits(int pid) const override {
+        if (pid <= 0) return false;
+        
+#ifdef _WIN32
+        HANDLE hProcess = OpenProcess(PROCESS_SET_INFORMATION, FALSE, pid);
+        if (!hProcess) {
+            return false;
+        }
+        
+        bool result = SetPriorityClass(hProcess, NORMAL_PRIORITY_CLASS) != 0;
+        CloseHandle(hProcess);
+        return result;
+#else
+        return setpriority(PRIO_PROCESS, pid, 0) == 0;
+#endif
+    }
+    
+    ResourceUsage aggregate_usage(const std::vector<int>& pids) const override {
+        ResourceUsage total;
+        
+        for (int pid : pids) {
+            if (pid <= 0) continue;
+            auto usage = sample_by_pid(pid);
+            total.cpu_pct += usage.cpu_pct;
+            total.mem_mb += usage.mem_mb;
+            total.net_in_kbps += usage.net_in_kbps;
+            total.net_out_kbps += usage.net_out_kbps;
+            total.disk_read_mb += usage.disk_read_mb;
+            total.disk_write_mb += usage.disk_write_mb;
+            total.handles += usage.handles;
+        }
+        
+        // Note: CPU percentage is per-core, so aggregate can exceed 100% on multi-core systems
+        // For example, 2 processes each using 100% CPU on a 4-core system = 200% aggregate
+        // No capping needed - the sum represents total CPU usage across all cores
+        
+        return total;
+    }
 
 private:
     int get_current_pid() const {
@@ -359,17 +542,138 @@ private:
 #endif
     }
     
+    int find_pid_by_name(const std::string& process_name) const {
+        if (process_name.empty()) {
+            return 0;
+        }
+        
+#ifdef _WIN32
+        // Windows: Use CreateToolhelp32Snapshot to enumerate processes
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnapshot == INVALID_HANDLE_VALUE) {
+            return 0;
+        }
+        
+        PROCESSENTRY32 pe32;
+        pe32.dwSize = sizeof(PROCESSENTRY32);
+        
+        if (Process32First(hSnapshot, &pe32)) {
+            do {
+                std::string exe_name = pe32.szExeFile;
+                // Remove .exe extension if present for comparison
+                if (exe_name.size() > 4 && 
+                    exe_name.substr(exe_name.size() - 4) == ".exe") {
+                    exe_name = exe_name.substr(0, exe_name.size() - 4);
+                }
+                
+                // Compare with process_name (case-insensitive on Windows)
+                std::string exe_lower = exe_name;
+                std::string proc_lower = process_name;
+                std::transform(exe_lower.begin(), exe_lower.end(), exe_lower.begin(), ::tolower);
+                std::transform(proc_lower.begin(), proc_lower.end(), proc_lower.begin(), ::tolower);
+                if (exe_lower == proc_lower) {
+                    CloseHandle(hSnapshot);
+                    return static_cast<int>(pe32.th32ProcessID);
+                }
+            } while (Process32Next(hSnapshot, &pe32));
+        }
+        
+        CloseHandle(hSnapshot);
+        return 0;
+#else
+        // Linux: Read /proc directory to find processes by name
+        DIR* proc_dir = opendir("/proc");
+        if (!proc_dir) {
+            return 0;
+        }
+        
+        struct dirent* entry;
+        while ((entry = readdir(proc_dir)) != nullptr) {
+            // Check if entry is a PID directory (numeric)
+            if (entry->d_type != DT_DIR) {
+                continue;
+            }
+            
+            bool is_numeric = true;
+            for (int i = 0; entry->d_name[i] != '\0'; i++) {
+                if (!std::isdigit(entry->d_name[i])) {
+                    is_numeric = false;
+                    break;
+                }
+            }
+            
+            if (!is_numeric) {
+                continue;
+            }
+            
+            int pid = std::stoi(entry->d_name);
+            
+            // Read /proc/PID/comm or /proc/PID/cmdline to get process name
+            std::string comm_path = "/proc/" + std::string(entry->d_name) + "/comm";
+            std::ifstream comm_file(comm_path);
+            if (comm_file.is_open()) {
+                std::string proc_name;
+                std::getline(comm_file, proc_name);
+                // Remove trailing newline if present
+                if (!proc_name.empty() && proc_name.back() == '\n') {
+                    proc_name.pop_back();
+                }
+                
+                if (proc_name == process_name) {
+                    closedir(proc_dir);
+                    return pid;
+                }
+            }
+            
+            // Fallback: try cmdline (first argument)
+            std::string cmdline_path = "/proc/" + std::string(entry->d_name) + "/cmdline";
+            std::ifstream cmdline_file(cmdline_path);
+            if (cmdline_file.is_open()) {
+                std::string cmdline;
+                std::getline(cmdline_file, cmdline);
+                if (!cmdline.empty()) {
+                    // Extract executable name from path
+                    size_t last_slash = cmdline.find_last_of('/');
+                    std::string exe_name = (last_slash != std::string::npos) 
+                        ? cmdline.substr(last_slash + 1) 
+                        : cmdline;
+                    
+                    // Remove null terminators (cmdline uses null-separated args)
+                    size_t null_pos = exe_name.find('\0');
+                    if (null_pos != std::string::npos) {
+                        exe_name = exe_name.substr(0, null_pos);
+                    }
+                    
+                    if (exe_name == process_name) {
+                        closedir(proc_dir);
+                        return pid;
+                    }
+                }
+            }
+        }
+        
+        closedir(proc_dir);
+        return 0;
+#endif
+    }
+    
 #ifdef _WIN32
     struct ProcessCpuTime {
         std::chrono::steady_clock::time_point last_time;
         uint64_t last_total;
     };
     mutable std::map<int, ProcessCpuTime> process_cpu_times_;
+    mutable uint64_t prev_net_rx_bytes_{0};
+    mutable uint64_t prev_net_tx_bytes_{0};
+    mutable int64_t prev_net_time_{0};
 #else
     mutable std::map<int, std::pair<int64_t, uint64_t>> prev_cpu_times_;
     mutable uint64_t prev_system_cpu_time_{0};
     mutable uint64_t prev_system_idle_time_{0};
     mutable int64_t prev_system_time_{0};
+    mutable uint64_t prev_net_rx_bytes_{0};
+    mutable uint64_t prev_net_tx_bytes_{0};
+    mutable int64_t prev_net_time_{0};
 #endif
 };
 
