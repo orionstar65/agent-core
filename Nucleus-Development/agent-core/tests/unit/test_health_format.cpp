@@ -5,28 +5,118 @@
 #include <chrono>
 #include <thread>
 #include <fstream>
+#include <filesystem>
+#include <cmath>
+#include <string>
+#include <sstream>
+
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 using namespace agent;
 
+#ifdef _WIN32
+const std::string TEST_DIR = "C:/tmp/agent-health-format-test";
+#else
 const std::string TEST_DIR = "/tmp/agent-health-format-test";
+#endif
 
 void setup_test_dir() {
-    system(("rm -rf " + TEST_DIR).c_str());
-    mkdir(TEST_DIR.c_str(), 0755);
+    // Remove directory if it exists (ignore errors)
+    std::error_code ec;
+    std::filesystem::remove_all(TEST_DIR, ec);
+    std::filesystem::create_directories(TEST_DIR);
 }
 
 void cleanup_test_dir() {
-    system(("rm -rf " + TEST_DIR).c_str());
+    // Remove directory if it exists (ignore errors)
+    std::error_code ec;
+    std::filesystem::remove_all(TEST_DIR, ec);
+}
+
+// Helper to get platform-appropriate extension name
+std::string get_extension_path(const std::string& name) {
+#ifdef _WIN32
+    // Convert .sh to .bat on Windows
+    if (name.find(".sh") != std::string::npos) {
+        return TEST_DIR + "/" + name.substr(0, name.length() - 3) + ".bat";
+    }
+    return TEST_DIR + "/" + name;
+#else
+    return TEST_DIR + "/" + name;
+#endif
+}
+
+// Helper to convert Unix commands to Windows equivalents
+std::string convert_script_for_platform(const std::string& script) {
+#ifdef _WIN32
+    std::string win_script = script;
+    // Replace sleep with ping (more reliable than timeout on Windows)
+    // ping 127.0.0.1 -n (X+1) >nul waits X seconds
+    std::istringstream iss(win_script);
+    std::ostringstream oss;
+    std::string line;
+    bool first_line = true;
+    
+    while (std::getline(iss, line)) {
+        if (!first_line) oss << "\r\n";
+        first_line = false;
+        
+        // Replace sleep commands
+        size_t pos = 0;
+        while ((pos = line.find("sleep ", pos)) != std::string::npos) {
+            size_t end = line.find_first_of(" \n\r", pos + 6);
+            if (end == std::string::npos) end = line.length();
+            
+            std::string duration = line.substr(pos + 6, end - pos - 6);
+            // Convert decimal seconds to whole seconds (round up)
+            double secs = std::stod(duration);
+            int whole_secs = static_cast<int>(std::ceil(secs));
+            if (whole_secs < 1) whole_secs = 1; // Minimum 1 second
+            
+            // ping -n (X+1) waits X seconds
+            line.replace(pos, end - pos, "ping 127.0.0.1 -n " + std::to_string(whole_secs + 1) + " >nul");
+            pos += 40; // Move past replacement
+        }
+        
+        // Replace exit commands
+        pos = 0;
+        while ((pos = line.find("exit 1", pos)) != std::string::npos) {
+            line.replace(pos, 6, "exit /b 1");
+            pos += 9;
+        }
+        pos = 0;
+        while ((pos = line.find("exit 0", pos)) != std::string::npos) {
+            line.replace(pos, 6, "exit /b 0");
+            pos += 9;
+        }
+        
+        oss << line;
+    }
+    
+    return oss.str();
+#else
+    return script;
+#endif
 }
 
 void create_test_script(const std::string& name, const std::string& script) {
-    std::string path = TEST_DIR + "/" + name;
+    std::string path = get_extension_path(name);
+    std::string platform_script = convert_script_for_platform(script);
+    
     std::ofstream file(path);
-    file << "#!/bin/bash\n" << script;
-    file.close();
+#ifdef _WIN32
+    file << "@echo off\n" << platform_script;
+#else
+    file << "#!/bin/bash\n" << platform_script;
     chmod(path.c_str(), 0755);
+#endif
+    file.close();
 }
 
 // Simulate the health query handler logic from main.cpp
@@ -72,12 +162,12 @@ void test_health_format_running_extensions() {
     
     ExtensionSpec spec1;
     spec1.name = "ext1";
-    spec1.exec_path = TEST_DIR + "/ext1.sh";
+    spec1.exec_path = get_extension_path("ext1.sh");
     spec1.enabled = true;
     
     ExtensionSpec spec2;
     spec2.name = "ext2";
-    spec2.exec_path = TEST_DIR + "/ext2.sh";
+    spec2.exec_path = get_extension_path("ext2.sh");
     spec2.enabled = true;
     
     ext_mgr->launch({spec1, spec2});
@@ -142,7 +232,7 @@ void test_health_format_quarantined_extension() {
     
     ExtensionSpec spec;
     spec.name = "crasher";
-    spec.exec_path = TEST_DIR + "/crasher.sh";
+    spec.exec_path = get_extension_path("crasher.sh");
     spec.enabled = true;
     
     ext_mgr->launch({spec});

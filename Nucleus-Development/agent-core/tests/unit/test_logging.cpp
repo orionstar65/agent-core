@@ -37,17 +37,20 @@ private:
 void test_json_logging_fields() {
     std::cout << "\n=== Test: JSON Logging Required Fields ===\n";
     
-    LogCapture capture;
-    auto logger = create_logger("info", true);
-    
     std::string deviceId = "test-device-123";
     std::string correlationId = "corr-abc-xyz";
     std::string eventId = "evt-001";
     
-    logger->log(LogLevel::Info, "TestSubsystem", "Test message", 
-                {{"key1", "value1"}}, deviceId, correlationId, eventId);
-    
-    std::string output = capture.get_output();
+    std::string output;
+    {
+        LogCapture capture;
+        auto logger = create_logger("info", true);
+        
+        logger->log(LogLevel::Info, "TestSubsystem", "Test message", 
+                    {{"key1", "value1"}}, deviceId, correlationId, eventId);
+        
+        output = capture.get_output();
+    } // LogCapture destroyed here, stdout restored
     
     // Find the JSON log line (skip initialization message)
     std::istringstream iss(output);
@@ -98,13 +101,16 @@ void test_json_logging_fields() {
 void test_json_logging_optional_fields() {
     std::cout << "\n=== Test: JSON Logging Optional Fields ===\n";
     
-    LogCapture capture;
-    auto logger = create_logger("info", true);
-    
-    // Log without optional fields
-    logger->log(LogLevel::Warn, "TestSubsystem", "Test without optional fields");
-    
-    std::string output = capture.get_output();
+    std::string output;
+    {
+        LogCapture capture;
+        auto logger = create_logger("info", true);
+        
+        // Log without optional fields
+        logger->log(LogLevel::Warn, "TestSubsystem", "Test without optional fields");
+        
+        output = capture.get_output();
+    } // LogCapture destroyed here, stdout restored
     
     // Find the JSON log line (skip initialization message)
     std::istringstream iss(output);
@@ -132,23 +138,27 @@ void test_json_logging_optional_fields() {
 void test_log_level_filtering() {
     std::cout << "\n=== Test: Log Level Filtering ===\n";
     
-    LogCapture capture;
-    auto logger = create_logger("warn", true);
-    capture.clear();  // Clear initialization message
+    std::string output;
+    {
+        LogCapture capture;
+        auto logger = create_logger("warn", true);
+        capture.clear();  // Clear initialization message
+        
+        // These should be filtered out
+        logger->log(LogLevel::Trace, "Test", "Trace message");
+        logger->log(LogLevel::Debug, "Test", "Debug message");
+        logger->log(LogLevel::Info, "Test", "Info message");
+        
+        output = capture.get_output();
+        assert(output.empty() && "Lower level logs should be filtered");
+        
+        // These should be logged
+        logger->log(LogLevel::Warn, "Test", "Warn message");
+        logger->log(LogLevel::Error, "Test", "Error message");
+        
+        output = capture.get_output();
+    } // LogCapture destroyed here, stdout restored
     
-    // These should be filtered out
-    logger->log(LogLevel::Trace, "Test", "Trace message");
-    logger->log(LogLevel::Debug, "Test", "Debug message");
-    logger->log(LogLevel::Info, "Test", "Info message");
-    
-    std::string output = capture.get_output();
-    assert(output.empty() && "Lower level logs should be filtered");
-    
-    // These should be logged
-    logger->log(LogLevel::Warn, "Test", "Warn message");
-    logger->log(LogLevel::Error, "Test", "Error message");
-    
-    output = capture.get_output();
     assert(!output.empty() && "Warn and above should be logged");
     
     // Count non-empty lines (excluding initialization message)
@@ -168,13 +178,16 @@ void test_log_level_filtering() {
 void test_text_logging_format() {
     std::cout << "\n=== Test: Text Logging Format ===\n";
     
-    LogCapture capture;
-    auto logger = create_logger("info", false);
-    
-    logger->log(LogLevel::Info, "TestSubsystem", "Test message",
-                {{"key1", "value1"}}, "device-123", "corr-456", "evt-789");
-    
-    std::string output = capture.get_output();
+    std::string output;
+    {
+        LogCapture capture;
+        auto logger = create_logger("info", false);
+        
+        logger->log(LogLevel::Info, "TestSubsystem", "Test message",
+                    {{"key1", "value1"}}, "device-123", "corr-456", "evt-789");
+        
+        output = capture.get_output();
+    } // LogCapture destroyed here, stdout restored
     
     // Check for required components in text format
     assert(output.find("[INFO]") != std::string::npos && "Should contain level");

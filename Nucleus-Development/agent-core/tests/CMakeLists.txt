@@ -243,6 +243,51 @@ else()
     target_link_libraries(test_logging_throttling PRIVATE pthread)
 endif()
 
+# Unit test for ExtensionManager
+add_executable(test_extension_manager
+    unit/test_extension_manager.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_extension_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_extension_manager PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_extension_manager PRIVATE ws2_32)
+else()
+    target_link_libraries(test_extension_manager PRIVATE pthread)
+endif()
+
+# Integration test for Extension Lifecycle
+add_executable(test_extension_lifecycle
+    integration/test_extension_lifecycle.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_extension_lifecycle PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_extension_lifecycle PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_extension_lifecycle PRIVATE ws2_32)
+else()
+    target_link_libraries(test_extension_lifecycle PRIVATE pthread)
+endif()
+
+# Unit test for Health Response Format
+add_executable(test_health_format
+    unit/test_health_format.cpp
+    ${AGENT_LIB_SOURCES}
+)
+
+target_include_directories(test_health_format PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_health_format PRIVATE CURL::libcurl)
+
+if(WIN32)
+    target_link_libraries(test_health_format PRIVATE ws2_32)
+else()
+    target_link_libraries(test_health_format PRIVATE pthread)
+endif()
+
 # Register tests with CTest and set working directory
 add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME LoggingUnitTest COMMAND test_logging WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -253,6 +298,7 @@ add_test(NAME AuthenticationIntegrationTest COMMAND test_auth WORKING_DIRECTORY 
 add_test(NAME IdentityDiscoveryTest COMMAND test_identity WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ZeroMQIntegrationTest COMMAND test_zmq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME LoggingThrottlingIntegrationTest COMMAND test_logging_throttling WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME ZeroMQLoadTest COMMAND test_zmq_load WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ExtensionManagerUnitTest COMMAND test_extension_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ExtensionLifecycleIntegrationTest COMMAND test_extension_lifecycle WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

@@ -17,6 +17,8 @@ class LoggerImpl : public Logger {
 public:
     LoggerImpl(const std::string& level, bool json) 
         : min_level_(parse_level(level)), use_json_(json) {
+        std::cout << "Logger initialized: level=" << level 
+                  << ", json=" << (json ? "true" : "false") << "\n";
     }
     
     void log(LogLevel level, 

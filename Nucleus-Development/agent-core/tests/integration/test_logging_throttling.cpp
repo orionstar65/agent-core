@@ -48,30 +48,33 @@ private:
 void test_throttled_logger_integration() {
     std::cout << "\n=== Test: Throttled Logger Integration ===\n";
     
-    LogCapture capture;
-    
-    Config::Logging::Throttle throttle_config;
-    throttle_config.enabled = true;
-    throttle_config.error_threshold = 5;
-    throttle_config.window_seconds = 60;
-    
-    auto metrics = create_metrics();
-    LoggingThrottleConfig throttle_cfg;
-    throttle_cfg.enabled = throttle_config.enabled;
-    throttle_cfg.error_threshold = throttle_config.error_threshold;
-    throttle_cfg.window_seconds = throttle_config.window_seconds;
-    auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
-    
-    std::string deviceId = "test-device";
-    std::string correlationId = "test-corr-123";
-    
-    // Generate 10 errors - first 5 should be logged, next 5 should be throttled
-    for (int i = 0; i < 10; i++) {
-        logger->log(LogLevel::Error, "Auth", "Authentication failed", 
-                    {{"attempt", std::to_string(i+1)}}, deviceId, correlationId);
-    }
-    
-    auto lines = capture.get_lines();
+    std::vector<std::string> lines;
+    {
+        LogCapture capture;
+        
+        Config::Logging::Throttle throttle_config;
+        throttle_config.enabled = true;
+        throttle_config.error_threshold = 5;
+        throttle_config.window_seconds = 60;
+        
+        auto metrics = create_metrics();
+        LoggingThrottleConfig throttle_cfg;
+        throttle_cfg.enabled = throttle_config.enabled;
+        throttle_cfg.error_threshold = throttle_config.error_threshold;
+        throttle_cfg.window_seconds = throttle_config.window_seconds;
+        auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
+        
+        std::string deviceId = "test-device";
+        std::string correlationId = "test-corr-123";
+        
+        // Generate 10 errors - first 5 should be logged, next 5 should be throttled
+        for (int i = 0; i < 10; i++) {
+            logger->log(LogLevel::Error, "Auth", "Authentication failed", 
+                        {{"attempt", std::to_string(i+1)}}, deviceId, correlationId);
+        }
+        
+        lines = capture.get_lines();
+    } // LogCapture destroyed here, stdout restored
     
     // Should have: 5 error logs + 1 activation message
     int error_count = 0;
@@ -99,18 +102,21 @@ void test_throttled_logger_integration() {
 void test_correlation_id_propagation() {
     std::cout << "\n=== Test: Correlation ID Propagation ===\n";
     
-    LogCapture capture;
-    auto logger = create_logger("info", true);
-    
     std::string correlationId = "corr-test-456";
     std::string deviceId = "device-789";
     
-    // Log multiple messages with same correlation ID
-    logger->log(LogLevel::Info, "Auth", "Starting authentication", {}, deviceId, correlationId);
-    logger->log(LogLevel::Info, "Auth", "Validating certificate", {}, deviceId, correlationId);
-    logger->log(LogLevel::Info, "Auth", "Authentication complete", {}, deviceId, correlationId);
-    
-    auto lines = capture.get_lines();
+    std::vector<std::string> lines;
+    {
+        LogCapture capture;
+        auto logger = create_logger("info", true);
+        
+        // Log multiple messages with same correlation ID
+        logger->log(LogLevel::Info, "Auth", "Starting authentication", {}, deviceId, correlationId);
+        logger->log(LogLevel::Info, "Auth", "Validating certificate", {}, deviceId, correlationId);
+        logger->log(LogLevel::Info, "Auth", "Authentication complete", {}, deviceId, correlationId);
+        
+        lines = capture.get_lines();
+    } // LogCapture destroyed here, stdout restored
     
     // Verify all logs have the same correlation ID
     for (const auto& line : lines) {
@@ -131,31 +137,34 @@ void test_correlation_id_propagation() {
 void test_throttling_summary_emission() {
     std::cout << "\n=== Test: Throttling Summary Emission ===\n";
     
-    LogCapture capture;
-    
-    Config::Logging::Throttle throttle_config;
-    throttle_config.enabled = true;
-    throttle_config.error_threshold = 3;
-    throttle_config.window_seconds = 60;
-    
-    auto metrics = create_metrics();
-    LoggingThrottleConfig throttle_cfg;
-    throttle_cfg.enabled = throttle_config.enabled;
-    throttle_cfg.error_threshold = throttle_config.error_threshold;
-    throttle_cfg.window_seconds = throttle_config.window_seconds;
-    auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
-    
-    // Trigger throttling
-    for (int i = 0; i < 5; i++) {
-        logger->log(LogLevel::Error, "Network", "Connection failed", {}, "device-1");
-    }
-    
-    capture.clear();
-    
-    // Emit a non-error log - should trigger summary
-    logger->log(LogLevel::Info, "Network", "Connection restored", {}, "device-1");
-    
-    auto lines = capture.get_lines();
+    std::vector<std::string> lines;
+    {
+        LogCapture capture;
+        
+        Config::Logging::Throttle throttle_config;
+        throttle_config.enabled = true;
+        throttle_config.error_threshold = 3;
+        throttle_config.window_seconds = 60;
+        
+        auto metrics = create_metrics();
+        LoggingThrottleConfig throttle_cfg;
+        throttle_cfg.enabled = throttle_config.enabled;
+        throttle_cfg.error_threshold = throttle_config.error_threshold;
+        throttle_cfg.window_seconds = throttle_config.window_seconds;
+        auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
+        
+        // Trigger throttling
+        for (int i = 0; i < 5; i++) {
+            logger->log(LogLevel::Error, "Network", "Connection failed", {}, "device-1");
+        }
+        
+        capture.clear();
+        
+        // Emit a non-error log - should trigger summary
+        logger->log(LogLevel::Info, "Network", "Connection restored", {}, "device-1");
+        
+        lines = capture.get_lines();
+    } // LogCapture destroyed here, stdout restored
     
     // Should have summary message
     bool found_summary = false;
@@ -181,30 +190,34 @@ void test_throttling_summary_emission() {
 void test_offline_scenario_simulation() {
     std::cout << "\n=== Test: Offline Scenario Simulation ===\n";
     
-    LogCapture capture;
-    
-    Config::Logging::Throttle throttle_config;
-    throttle_config.enabled = true;
-    throttle_config.error_threshold = 5;
-    throttle_config.window_seconds = 60;
-    
-    auto metrics = create_metrics();
-    LoggingThrottleConfig throttle_cfg;
-    throttle_cfg.enabled = throttle_config.enabled;
-    throttle_cfg.error_threshold = throttle_config.error_threshold;
-    throttle_cfg.window_seconds = throttle_config.window_seconds;
-    auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
-    
-    std::string deviceId = "offline-device";
-    std::string correlationId = "offline-op-001";
-    
-    // Simulate offline scenario: many network errors
-    for (int i = 0; i < 20; i++) {
-        logger->log(LogLevel::Error, "Network", "Network unreachable", 
-                   {{"retry", std::to_string(i)}}, deviceId, correlationId);
-    }
-    
-    auto lines = capture.get_lines();
+    const int error_threshold = 5;
+    std::vector<std::string> lines;
+    {
+        LogCapture capture;
+        
+        Config::Logging::Throttle throttle_config;
+        throttle_config.enabled = true;
+        throttle_config.error_threshold = error_threshold;
+        throttle_config.window_seconds = 60;
+        
+        auto metrics = create_metrics();
+        LoggingThrottleConfig throttle_cfg;
+        throttle_cfg.enabled = throttle_config.enabled;
+        throttle_cfg.error_threshold = throttle_config.error_threshold;
+        throttle_cfg.window_seconds = throttle_config.window_seconds;
+        auto logger = create_logger_with_throttle("info", true, throttle_cfg, metrics.get());
+        
+        std::string deviceId = "offline-device";
+        std::string correlationId = "offline-op-001";
+        
+        // Simulate offline scenario: many network errors
+        for (int i = 0; i < 20; i++) {
+            logger->log(LogLevel::Error, "Network", "Network unreachable", 
+                       {{"retry", std::to_string(i)}}, deviceId, correlationId);
+        }
+        
+        lines = capture.get_lines();
+    } // LogCapture destroyed here, stdout restored
     
     // Count actual error logs (should be limited by throttling)
     int error_logs = 0;
@@ -220,7 +233,7 @@ void test_offline_scenario_simulation() {
     }
     
     // Should have logged threshold errors + activation, not all 20
-    assert(error_logs <= throttle_config.error_threshold + 1 && 
+    assert(error_logs <= error_threshold + 1 && 
            "Should not log all errors when throttled");
     
     std::cout << "✓ Offline scenario throttles repetitive errors\n";
