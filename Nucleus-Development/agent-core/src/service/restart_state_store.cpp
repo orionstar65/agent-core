@@ -35,12 +35,13 @@ public:
 #ifdef _WIN32
         if (_mkdir(parent_dir.c_str()) != 0 && errno != EEXIST) {
             // Try creating parent directories recursively
-            // Build up the path incrementally, including separators
+            // Build up the path incrementally, excluding separators (consistent with Linux)
             size_t pos = 0;
             while ((pos = parent_dir.find_first_of("/\\", pos + 1)) != std::string::npos) {
-                // Include the separator in the substring (pos + 1)
-                std::string subdir = parent_dir.substr(0, pos + 1);
-                if (_mkdir(subdir.c_str()) != 0 && errno != EEXIST) {
+                // Extract directory up to but not including the separator
+                // For "C:\\temp\\agent", this creates "C:" first, then "C:\\temp"
+                std::string subdir = parent_dir.substr(0, pos);
+                if (!subdir.empty() && _mkdir(subdir.c_str()) != 0 && errno != EEXIST) {
                     // Continue trying - some directories may already exist
                 }
             }

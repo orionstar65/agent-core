@@ -10,6 +10,8 @@
 #include "agent/extension_manager.hpp"
 #include "agent/resource_monitor.hpp"
 #include "agent/telemetry.hpp"
+#include "agent/telemetry_collector.hpp"
+#include "agent/telemetry_cache.hpp"
 #include "agent/retry.hpp"
 #include "agent/restart_manager.hpp"
 #include "agent/restart_state_store.hpp"
@@ -21,6 +23,7 @@
 #include <chrono>
 #include <map>
 #include <errno.h>
+#include <nlohmann/json.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -135,6 +138,26 @@ public:
         ext_manager_ = create_extension_manager(config_->extensions);
         resource_monitor_ = create_resource_monitor();
         
+        // Initialize telemetry if enabled
+        if (config_->telemetry.enabled) {
+            telemetry_collector_ = std::make_unique<TelemetryCollector>(
+                resource_monitor_.get(),
+                ext_manager_.get(),
+                logger_.get(),
+                metrics_.get(),
+                *config_);
+            
+            telemetry_cache_ = std::make_unique<TelemetryCache>(
+                *config_,
+                mqtt_client_.get(),
+                retry_policy_.get(),
+                logger_.get(),
+                metrics_.get(),
+                identity_);
+            
+            log(LogLevel::Info, "Telemetry", "Telemetry system initialized");
+        }
+        
         log(LogLevel::Info, "Core", "Initialization complete");
         return true;
     }
@@ -206,6 +229,70 @@ public:
                 ext_manager_->monitor();
             }
             
+            // Telemetry collection
+            if (config_->telemetry.enabled && telemetry_collector_ && telemetry_cache_) {
+                int sampling_interval = config_->telemetry.sampling_interval_s;
+                if (loop_count - telemetry_sample_count_ >= sampling_interval) {
+                    try {
+                        auto batch = telemetry_collector_->collect();
+                        telemetry_collector_->check_alerts(batch);
+                        
+                        telemetry_batch_queue_.push_back(batch);
+                        telemetry_sample_count_ = loop_count;
+                        
+                        // Check if we should publish a batch
+                        if (telemetry_batch_queue_.size() >= static_cast<size_t>(config_->telemetry.batch_size)) {
+                            // Combine batches into single payload
+                            TelemetryBatch combined_batch;
+                            combined_batch.date_time = telemetry_batch_queue_.back().date_time;
+                            
+                            for (const auto& b : telemetry_batch_queue_) {
+                                combined_batch.readings.insert(
+                                    combined_batch.readings.end(),
+                                    b.readings.begin(),
+                                    b.readings.end());
+                            }
+                            
+                            std::string json_payload = telemetry_collector_->to_json(combined_batch);
+                            
+                            // Attempt to publish
+                            MqttMsg msg;
+                            msg.topic = "/DeviceMonitoring/" + 
+                                       (config_->telemetry.modality.empty() ? "CS" : config_->telemetry.modality) + "/" +
+                                       (identity_.material_number.empty() ? "GATEWAY" : identity_.material_number) + "/" +
+                                       (identity_.serial_number.empty() ? identity_.device_serial : identity_.serial_number);
+                            msg.payload = json_payload;
+                            msg.qos = 1;
+                            
+                            try {
+                                mqtt_client_->publish(msg);
+                                if (metrics_) {
+                                    metrics_->increment("telemetry.published");
+                                }
+                                log(LogLevel::Debug, "Telemetry", "Published telemetry batch");
+                            } catch (const std::exception& e) {
+                                // Store in cache for retry
+                                telemetry_cache_->store(json_payload);
+                                log(LogLevel::Warn, "Telemetry", 
+                                    "Failed to publish telemetry, cached for retry: " + std::string(e.what()));
+                            }
+                            
+                            telemetry_batch_queue_.clear();
+                        }
+                    } catch (const std::exception& e) {
+                        log(LogLevel::Error, "Telemetry", 
+                            "Failed to collect telemetry: " + std::string(e.what()));
+                    }
+                }
+                
+                // Retry cached batches periodically (every 60 seconds)
+                static int last_telemetry_retry = 0;
+                if (loop_count - last_telemetry_retry >= 60) {
+                    telemetry_cache_->retry_cached();
+                    last_telemetry_retry = loop_count;
+                }
+            }
+            
             // Extension health pings
             if (loop_count % config_->extensions.health_check_interval_s == 0) {
                 ext_manager_->health_ping();
@@ -252,6 +339,11 @@ private:
     std::unique_ptr<Registration> registration_;
     std::unique_ptr<ExtensionManager> ext_manager_;
     std::unique_ptr<ResourceMonitor> resource_monitor_;
+    std::unique_ptr<TelemetryCollector> telemetry_collector_;
+    std::unique_ptr<TelemetryCache> telemetry_cache_;
+    
+    int telemetry_sample_count_{0};
+    std::vector<TelemetryBatch> telemetry_batch_queue_;
     
     void log(LogLevel level, const std::string& subsystem, const std::string& message, 
              const std::string& correlationId = "", const std::string& eventId = "") {
@@ -286,7 +378,8 @@ private:
         if (metrics_) {
             metrics_->gauge("cpu.usage", usage.cpu_pct);
             metrics_->gauge("memory.usage", usage.mem_mb);
-            metrics_->gauge("network.usage", usage.net_kbps);
+            int64_t total_net = usage.net_in_kbps + usage.net_out_kbps;
+            metrics_->gauge("network.usage", static_cast<double>(total_net));
         }
         
         if (resource_monitor_->exceeds_budget(usage, *config_)) {
@@ -323,33 +416,29 @@ private:
         // Get health status from extension manager
         auto health_map = ext_manager_->health_status();
         
-        // Build JSON response
-        std::string json = "{\"extensions\":[";
-        bool first = true;
+        // Build JSON response using nlohmann::json library
+        nlohmann::json json;
+        json["extensions"] = nlohmann::json::array();
         
         for (const auto& [name, health] : health_map) {
-            if (!first) json += ",";
-            first = false;
-            
-            json += "{";
-            json += "\"name\":\"" + name + "\",";
-            json += "\"state\":" + std::to_string(static_cast<int>(health.state)) + ",";
-            json += "\"restart_count\":" + std::to_string(health.restart_count) + ",";
-            json += "\"responding\":" + std::string(health.responding ? "true" : "false");
-            json += "}";
+            nlohmann::json ext_json;
+            ext_json["name"] = name;
+            ext_json["state"] = static_cast<int>(health.state);
+            ext_json["restart_count"] = health.restart_count;
+            ext_json["responding"] = health.responding;
+            json["extensions"].push_back(ext_json);
         }
         
-        json += "],";
-        json += "\"agent_uptime_s\":" + std::to_string(
-            std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::steady_clock::now() - start_time_).count());
-        json += "}";
+        json["agent_uptime_s"] = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - start_time_).count();
+        
+        std::string json_str = json.dump();
         
         // Send response via bus
         Envelope reply;
         reply.topic = req.topic + ".reply";
         reply.correlation_id = req.correlation_id;
-        reply.payload_json = json;
+        reply.payload_json = json_str;
         reply.ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         

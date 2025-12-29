@@ -56,6 +56,8 @@ set(AGENT_CORE_SOURCES
     src/telemetry/logging.cpp
     src/telemetry/metrics.cpp
     src/telemetry/log_throttler.cpp
+    src/telemetry/telemetry_collector.cpp
+    src/telemetry/telemetry_cache.cpp
 )
 
 # Platform-specific sources
