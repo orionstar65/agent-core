@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <cstdlib>
 #include "agent/uuid.hpp"
 
 namespace fs = std::filesystem;
@@ -28,8 +29,19 @@ TelemetryCache::TelemetryCache(const Config& config,
     if (!config.telemetry.cache_dir.empty()) {
         cache_dir_ = config.telemetry.cache_dir;
     } else {
-        // Default to state directory + telemetry_cache
+        // Default to platform-specific cache directory
+#ifdef _WIN32
+        // Windows: Use %LOCALAPPDATA% or current directory
+        const char* local_appdata = std::getenv("LOCALAPPDATA");
+        if (local_appdata) {
+            cache_dir_ = std::string(local_appdata) + "\\agent-core\\telemetry_cache";
+        } else {
+            cache_dir_ = ".\\telemetry_cache";
+        }
+#else
+        // Linux: Use /var/lib/agent-core/telemetry_cache
         cache_dir_ = "/var/lib/agent-core/telemetry_cache";
+#endif
     }
     
     // Create cache directory if it doesn't exist

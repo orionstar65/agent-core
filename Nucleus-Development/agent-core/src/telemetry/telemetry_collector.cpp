@@ -1,4 +1,5 @@
 #include "agent/telemetry_collector.hpp"
+#include "agent/quota_enforcer.hpp"
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <iomanip>
@@ -198,6 +199,76 @@ void TelemetryCollector::add_reading(TelemetryBatch& batch, const std::string& c
     reading.name = name;
     reading.value = value;
     batch.readings.push_back(reading);
+}
+
+void TelemetryCollector::add_quota_event(TelemetryBatch& batch, const QuotaViolation& violation) const {
+    // Add quota event as a special reading
+    std::string stage_str;
+    switch (violation.stage) {
+        case QuotaStage::Warn:
+            stage_str = "warn";
+            break;
+        case QuotaStage::Throttle:
+            stage_str = "throttle";
+            break;
+        case QuotaStage::Stop:
+            stage_str = "stop";
+            break;
+        default:
+            return; // Don't add normal stage events
+    }
+    
+    // Add as a reading with special component name
+    TelemetryReading reading1;
+    reading1.component = "Quota";
+    reading1.name = violation.resource_type + "_" + stage_str;
+    reading1.value = violation.usage_pct;
+    batch.readings.push_back(reading1);
+    
+    // Also add offenders count
+    TelemetryReading reading2;
+    reading2.component = "Quota";
+    reading2.name = violation.resource_type + "_offenders";
+    reading2.value = static_cast<double>(violation.offenders.size());
+    batch.readings.push_back(reading2);
+}
+
+std::string TelemetryCollector::quota_event_to_json(const QuotaViolation& violation) const {
+    json j;
+    
+    std::string stage_str;
+    switch (violation.stage) {
+        case QuotaStage::Warn:
+            stage_str = "warn";
+            break;
+        case QuotaStage::Throttle:
+            stage_str = "throttle";
+            break;
+        case QuotaStage::Stop:
+            stage_str = "stop";
+            break;
+        default:
+            stage_str = "normal";
+    }
+    
+    j["eventType"] = "quota_violation";
+    j["resourceType"] = violation.resource_type;
+    j["usagePercent"] = violation.usage_pct;
+    j["stage"] = stage_str;
+    j["offenders"] = violation.offenders;
+    
+    auto time_t = std::chrono::system_clock::to_time_t(violation.timestamp);
+    std::tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &time_t);
+#else
+    localtime_r(&time_t, &tm_buf);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%S");
+    j["timestamp"] = oss.str();
+    
+    return j.dump();
 }
 
 }

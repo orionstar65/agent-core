@@ -95,7 +95,7 @@ Key configuration sections:
 - `mqtt`: MQTT broker settings
 - `cert`: Certificate management (path to certificate file)
 - `retry`: Backoff and circuit breaker (max attempts, delays)
-- `resource`: CPU/Memory/Network budgets
+- `resource`: CPU/Memory/Network budgets with three-stage enforcement policy with three-stage enforcement policy
 - `logging`: Log level, format (json/text), and throttling configuration
   - `throttle.enabled`: Enable/disable error throttling (default: true)
   - `throttle.errorThreshold`: Number of errors before throttling activates (default: 10)
@@ -616,6 +616,7 @@ ctest --test-dir build --output-on-failure
 - `test_logging` - Structured JSON logging unit tests
 - `test_log_throttler` - Log throttling unit tests
 - `test_retry_metrics` - Retry metrics unit tests
+- `test_quota_enforcer` - Resource quota enforcement unit tests
 - `test_logging_throttling` - Logging and throttling integration tests
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 - `test_identity` - Identity discovery tests (config override, JSON fallback, gateway mode, registry)
@@ -723,5 +724,57 @@ The test will verify:
 ```bash
 # Simulate network failures, crashes, etc.
 ./scripts/fault-inject.sh
+```
+
+## Resource Quota Enforcement
+
+Agent Core enforces global CPU, memory, and network quotas for the agent and all extensions using a three-stage policy.
+
+### Configuration
+
+```json
+{
+  "resource": {
+    "cpuMaxPct": 60,
+    "memMaxMB": 512,
+    "netMaxKBps": 256,
+    "warnThresholdPct": 80.0,
+    "throttleThresholdPct": 90.0,
+    "stopThresholdPct": 100.0,
+    "criticalExtensions": ["tunnel"],
+    "enforcementIntervalS": 10
+  }
+}
+```
+
+**Configuration Options:**
+- `cpuMaxPct`: Maximum CPU usage percentage (default: 60%)
+- `memMaxMB`: Maximum memory usage in MB (default: 512MB)
+- `netMaxKBps`: Maximum network bandwidth in KB/s (default: 256KB/s)
+- `warnThresholdPct`: Warn stage threshold as percentage of max (default: 80%)
+- `throttleThresholdPct`: Throttle stage threshold as percentage of max (default: 90%)
+- `stopThresholdPct`: Stop stage threshold as percentage of max (default: 100%)
+- `criticalExtensions`: Whitelist of extensions that should never be stopped
+- `enforcementIntervalS`: How often to check and enforce quotas in seconds (default: 10s)
+
+### Enforcement Stages
+
+1. **Warn** (≥80% of max): Logs quota violation warning, sends telemetry event
+2. **Throttle** (≥90% of max): Reduces CPU priority, sets memory limits, logs warning
+3. **Stop** (≥100% of max): Stops non-critical extensions exceeding quotas, logs critical warning
+
+### Features
+
+- **Offender Identification**: Identifies which processes (agent or extensions) are violating quotas
+- **Critical Extension Protection**: Extensions in the whitelist are never stopped, even at 100% usage
+- **Load Shedding**: Automatically stops non-critical extensions when quotas are exceeded
+- **Telemetry Integration**: Quota violations are sent to backend via MQTT for monitoring
+- **Cross-Platform**: Works on both Windows and Linux using platform-specific APIs
+
+### Testing
+
+```bash
+# Run quota enforcer unit tests
+./build/tests/test_quota_enforcer
 ```
 

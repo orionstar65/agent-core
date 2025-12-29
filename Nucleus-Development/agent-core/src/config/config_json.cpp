@@ -114,6 +114,24 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             if (resource.contains("netMaxKBps")) {
                 config->resource.net_max_kbps = resource["netMaxKBps"].get<int>();
             }
+            if (resource.contains("warnThresholdPct")) {
+                config->resource.warn_threshold_pct = resource["warnThresholdPct"].get<double>();
+            }
+            if (resource.contains("throttleThresholdPct")) {
+                config->resource.throttle_threshold_pct = resource["throttleThresholdPct"].get<double>();
+            }
+            if (resource.contains("stopThresholdPct")) {
+                config->resource.stop_threshold_pct = resource["stopThresholdPct"].get<double>();
+            }
+            if (resource.contains("criticalExtensions") && resource["criticalExtensions"].is_array()) {
+                config->resource.critical_extensions.clear();
+                for (const auto& ext : resource["criticalExtensions"]) {
+                    config->resource.critical_extensions.push_back(ext.get<std::string>());
+                }
+            }
+            if (resource.contains("enforcementIntervalS")) {
+                config->resource.enforcement_interval_s = resource["enforcementIntervalS"].get<int>();
+            }
         }
         
         // Parse logging

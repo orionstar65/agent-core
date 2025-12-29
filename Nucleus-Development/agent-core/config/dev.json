@@ -31,7 +31,12 @@
   "resource": {
     "cpuMaxPct": 60,
     "memMaxMB": 512,
-    "netMaxKBps": 256
+    "netMaxKBps": 256,
+    "warnThresholdPct": 80.0,
+    "throttleThresholdPct": 90.0,
+    "stopThresholdPct": 100.0,
+    "criticalExtensions": ["tunnel"],
+    "enforcementIntervalS": 10
   },
   "logging": {
     "level": "info",

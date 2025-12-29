@@ -4,10 +4,12 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <chrono>
 #include "config.hpp"
 #include "resource_monitor.hpp"
 #include "extension_manager.hpp"
 #include "telemetry.hpp"
+#include "quota_enforcer.hpp"
 
 namespace agent {
 
@@ -20,6 +22,14 @@ struct TelemetryReading {
 struct TelemetryBatch {
     std::string date_time;
     std::vector<TelemetryReading> readings;
+};
+
+struct QuotaEvent {
+    std::string resource_type;
+    double usage_pct;
+    std::string stage;  // "warn", "throttle", "stop"
+    std::vector<std::string> offenders;
+    std::chrono::system_clock::time_point timestamp;
 };
 
 class TelemetryCollector {
@@ -38,6 +48,12 @@ public:
     
     // Convert batch to JSON string
     std::string to_json(const TelemetryBatch& batch) const;
+    
+    // Add quota event to batch
+    void add_quota_event(TelemetryBatch& batch, const QuotaViolation& violation) const;
+    
+    // Convert quota event to JSON string (for immediate publishing)
+    std::string quota_event_to_json(const QuotaViolation& violation) const;
 
 private:
     ResourceMonitor* resource_monitor_;

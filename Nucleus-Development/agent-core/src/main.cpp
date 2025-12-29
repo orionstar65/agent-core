@@ -9,6 +9,7 @@
 #include "agent/bus.hpp"
 #include "agent/extension_manager.hpp"
 #include "agent/resource_monitor.hpp"
+#include "agent/quota_enforcer.hpp"
 #include "agent/telemetry.hpp"
 #include "agent/telemetry_collector.hpp"
 #include "agent/telemetry_cache.hpp"
@@ -137,6 +138,7 @@ public:
         mqtt_client_ = create_mqtt_client();
         ext_manager_ = create_extension_manager(config_->extensions);
         resource_monitor_ = create_resource_monitor();
+        quota_enforcer_ = std::make_unique<QuotaEnforcer>();
         
         // Initialize telemetry if enabled
         if (config_->telemetry.enabled) {
@@ -224,6 +226,73 @@ public:
                 check_resources();
             }
             
+            // Quota enforcement
+            if (quota_enforcer_ && loop_count % config_->resource.enforcement_interval_s == 0) {
+                try {
+                    auto violation = quota_enforcer_->evaluate(*config_,
+                                                               resource_monitor_.get(),
+                                                               ext_manager_.get());
+                    if (violation.stage != QuotaStage::Normal) {
+                        quota_enforcer_->enforce(violation,
+                                                resource_monitor_.get(),
+                                                ext_manager_.get(),
+                                                *config_);
+                        
+                        // Log violation
+                        std::string stage_str;
+                        switch (violation.stage) {
+                            case QuotaStage::Warn:
+                                stage_str = "Warn";
+                                break;
+                            case QuotaStage::Throttle:
+                                stage_str = "Throttle";
+                                break;
+                            case QuotaStage::Stop:
+                                stage_str = "Stop";
+                                break;
+                            default:
+                                stage_str = "Normal";
+                        }
+                        
+                        log(LogLevel::Warn, "Quota", 
+                            "Quota violation: " + violation.resource_type + 
+                            " at " + std::to_string(violation.usage_pct) + 
+                            "% (" + stage_str + " stage)");
+                        
+                        // Send quota event to backend via telemetry
+                        if (telemetry_collector_ && mqtt_client_) {
+                            std::string quota_json = telemetry_collector_->quota_event_to_json(violation);
+                            MqttMsg quota_msg;
+                            quota_msg.topic = "/DeviceMonitoring/Quota/" + 
+                                            (identity_.material_number.empty() ? "GATEWAY" : identity_.material_number) + "/" +
+                                            (identity_.serial_number.empty() ? identity_.device_serial : identity_.serial_number);
+                            quota_msg.payload = quota_json;
+                            quota_msg.qos = 1;
+                            
+                            try {
+                                mqtt_client_->publish(quota_msg);
+                                if (metrics_) {
+                                    metrics_->increment("quota.violations.published");
+                                }
+                            } catch (const std::exception& e) {
+                                log(LogLevel::Error, "Quota", 
+                                    "Failed to publish quota event: " + std::string(e.what()));
+                            }
+                        }
+                        
+                        if (metrics_) {
+                            metrics_->increment("quota.violations." + stage_str);
+                        }
+                    } else {
+                        // Reset enforcement if usage is back to normal
+                        quota_enforcer_->reset_all_enforcement();
+                    }
+                } catch (const std::exception& e) {
+                    log(LogLevel::Error, "Quota", 
+                        "Quota enforcement error: " + std::string(e.what()));
+                }
+            }
+            
             // Extension monitoring (crash detection, restarts)
             if (loop_count % config_->extensions.crash_detection_interval_s == 0) {
                 ext_manager_->monitor();
@@ -244,7 +313,10 @@ public:
                         if (telemetry_batch_queue_.size() >= static_cast<size_t>(config_->telemetry.batch_size)) {
                             // Combine batches into single payload
                             TelemetryBatch combined_batch;
-                            combined_batch.date_time = telemetry_batch_queue_.back().date_time;
+                            // Use timestamp from first batch - represents the start of the collection window
+                            // This is semantically correct as the combined batch contains readings collected
+                            // over a time period starting from this timestamp
+                            combined_batch.date_time = telemetry_batch_queue_.front().date_time;
                             
                             for (const auto& b : telemetry_batch_queue_) {
                                 combined_batch.readings.insert(
@@ -339,11 +411,13 @@ private:
     std::unique_ptr<Registration> registration_;
     std::unique_ptr<ExtensionManager> ext_manager_;
     std::unique_ptr<ResourceMonitor> resource_monitor_;
+    std::unique_ptr<QuotaEnforcer> quota_enforcer_;
     std::unique_ptr<TelemetryCollector> telemetry_collector_;
     std::unique_ptr<TelemetryCache> telemetry_cache_;
     
     int telemetry_sample_count_{0};
     std::vector<TelemetryBatch> telemetry_batch_queue_;
+    int quota_enforcement_count_{0};
     
     void log(LogLevel level, const std::string& subsystem, const std::string& message, 
              const std::string& correlationId = "", const std::string& eventId = "") {

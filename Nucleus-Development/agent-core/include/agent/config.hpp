@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <vector>
 
 namespace agent {
 
@@ -47,6 +48,17 @@ struct Config {
         int cpu_max_pct{60};
         int mem_max_mb{512};
         int net_max_kbps{256};
+        
+        // Policy thresholds (percentages of max limits)
+        double warn_threshold_pct{80.0};      // Warn at 80% of max
+        double throttle_threshold_pct{90.0};   // Throttle at 90% of max
+        double stop_threshold_pct{100.0};      // Stop at 100% of max
+        
+        // Critical extensions (whitelist - never stopped)
+        std::vector<std::string> critical_extensions;
+        
+        // Enforcement interval (seconds)
+        int enforcement_interval_s{10};
     } resource;
 
     struct Logging {
