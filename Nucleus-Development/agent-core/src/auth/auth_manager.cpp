@@ -1,4 +1,5 @@
 #include "agent/auth_manager.hpp"
+#include "agent/cert_validator.hpp"
 #include "agent/https_client.hpp"
 #include "agent/retry.hpp"
 #include <iostream>
@@ -36,6 +37,21 @@ public:
         if (cert_content.empty()) {
             std::cerr << "AuthManager: ERROR - Failed to read certificate from: "
                       << config.cert.cert_path << "\n";
+            return CertState::Failed;
+        }
+        
+        // Validate certificate before use
+        CertValidationResult validation_result = validate_certificate(cert_content);
+        if (!validation_result.valid) {
+            std::cerr << "AuthManager: ERROR - Certificate validation failed: "
+                      << validation_result.error_message << "\n";
+            if (validation_result.error == CertValidationError::Expired) {
+                std::cerr << "AuthManager: Certificate has expired\n";
+            } else if (validation_result.error == CertValidationError::InvalidFormat) {
+                std::cerr << "AuthManager: Certificate format is invalid\n";
+            } else if (validation_result.error == CertValidationError::NotYetValid) {
+                std::cerr << "AuthManager: Certificate is not yet valid\n";
+            }
             return CertState::Failed;
         }
         

@@ -24,6 +24,7 @@ endif()
 
 # Find required packages
 find_package(CURL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -42,6 +43,7 @@ set(AGENT_CORE_SOURCES
     src/net/net_path_selector.cpp
     src/net/https_client.cpp
     src/auth/auth_manager.cpp
+    src/auth/cert_validator.cpp
     src/reg/registration_ssm.cpp
     src/mqtt/mqtt_client.cpp
     src/bus/zmq_bus.cpp
@@ -78,7 +80,7 @@ endif()
 add_executable(agent-core ${AGENT_CORE_SOURCES})
 
 # Link libraries
-target_link_libraries(agent-core PRIVATE CURL::libcurl)
+target_link_libraries(agent-core PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 # Platform-specific libraries
 if(WIN32)

@@ -41,12 +41,18 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 - CMake 3.15 or higher
 - C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
 - libcurl (for HTTPS communication)
+- OpenSSL (for certificate validation and HTTPS security)
 - nlohmann/json (for JSON parsing)
 - ZeroMQ (libzmq + cppzmq for extension IPC)
 
 **Install on Ubuntu/Debian:**
 ```bash
-sudo apt-get install -y build-essential cmake libcurl4-openssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev
+sudo apt-get install -y build-essential cmake libcurl4-openssl-dev libssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev
+```
+
+**Install on Windows (MSYS2):**
+```bash
+pacman -S mingw-w64-ucrt-x86_64-openssl
 ```
 
 ### Quick Start
@@ -118,12 +124,24 @@ For gateway mode (`isGateway=true`), if standard identity fields are missing, a 
 Agent Core authenticates with the backend using X.509 certificates:
 
 1. Certificate is loaded from the path specified in `cert.certPath`
-2. HTTPS GET request is sent to `backend.baseUrl + backend.authPath + serialNumber + uuid`
-3. Certificate is passed in the `ARS-ClientCert` header
-4. Request includes device metadata in JSON body
-5. Response 200 indicates successful authentication
-6. Network errors and 5xx errors are retried according to retry policy
-7. 4xx errors (client errors) are not retried
+2. **Certificate Validation**: Certificate is validated before use:
+   - Expiration check: Rejects expired certificates with deterministic error
+   - Format validation: Validates certificate structure and PEM/base64 format
+   - Validity period: Checks notBefore and notAfter dates
+   - Deterministic errors: Returns specific error messages for expired, malformed, or invalid certificates
+3. HTTPS GET request is sent to `backend.baseUrl + backend.authPath + serialNumber + uuid`
+4. Certificate is passed in the `ARS-ClientCert` header (mTLS support planned for future)
+5. Request includes device metadata in JSON body
+6. **HTTPS Security**: SSL peer certificate verification and hostname verification are enabled for all HTTPS requests
+7. Response 200 indicates successful authentication
+8. Network errors and 5xx errors are retried according to retry policy
+9. 4xx errors (client errors) are not retried
+
+**Certificate Validation Errors:**
+- `InvalidFormat`: Certificate cannot be parsed or is malformed
+- `Expired`: Certificate has expired (notAfter date is in the past)
+- `NotYetValid`: Certificate is not yet valid (notBefore date is in the future)
+- Authentication will fail immediately if certificate validation fails (no retries)
 
 ### SSM Registration
 
@@ -618,11 +636,58 @@ ctest --test-dir build --output-on-failure
 - `test_retry_metrics` - Retry metrics unit tests
 - `test_quota_enforcer` - Resource quota enforcement unit tests
 - `test_logging_throttling` - Logging and throttling integration tests
+- `test_cert_validator` - Certificate validation unit tests (valid, expired, malformed certificates)
 - `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
 - `test_identity` - Identity discovery tests (config override, JSON fallback, gateway mode, registry)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
 - `test_zmq_load` - ZeroMQ load tests (10k msgs/min, PUB/SUB, REQ/REP, soak test)
 - `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
+
+### Test Certificates
+
+Certificate validator tests require test certificates in `tests/fixtures/certs/`. Generate them using the provided scripts:
+
+**Linux/macOS:**
+```bash
+cd tests/fixtures
+bash generate_test_certs.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+cd tests\fixtures
+powershell -ExecutionPolicy Bypass -File generate_test_certs.ps1
+```
+
+**Manual Generation:**
+
+1. **Valid Certificate** (valid for 365 days):
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout valid.key -out valid.pem \
+    -days 365 -nodes \
+    -subj "/CN=test-valid.example.com/O=Test/C=US"
+```
+
+2. **Expired Certificate** (expired in the past):
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout expired.key -out expired.pem \
+    -days 365 -nodes \
+    -subj "/CN=test-expired.example.com/O=Test/C=US" \
+    -startdate 20200101000000Z -enddate 20230301000000Z
+```
+
+3. **Malformed Certificate** (invalid format):
+Create a file `malformed.pem` with:
+```
+-----BEGIN CERTIFICATE-----
+This is not a valid certificate
+-----END CERTIFICATE-----
+```
+
+**Required Files:**
+- `tests/fixtures/certs/valid.pem` - Valid, non-expired certificate
+- `tests/fixtures/certs/expired.pem` - Expired certificate
+- `tests/fixtures/certs/malformed.pem` - Invalid certificate format
 
 ### ZeroMQ Integration Test
 

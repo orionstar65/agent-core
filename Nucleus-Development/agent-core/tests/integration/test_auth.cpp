@@ -158,6 +158,56 @@ void test_invalid_backend_url() {
     std::cout << "✓ Test passed: Invalid backend URL handled correctly (with retries)\n";
 }
 
+void test_expired_certificate() {
+    std::cout << "\n=== Test: Expired Certificate ===\n";
+    
+    auto auth_manager = create_auth_manager();
+    Config config = create_test_config();
+    Identity identity = create_test_identity();
+    
+    std::string agent_core_dir = get_agent_core_dir();
+    std::string expired_cert_path = agent_core_dir + "/tests/fixtures/certs/expired.pem";
+    
+    std::ifstream cert_file(expired_cert_path);
+    if (!cert_file.good()) {
+        std::cout << "⚠ Skipping test: Expired certificate file not found: " << expired_cert_path << "\n";
+        std::cout << "  Run certificate generation script to create test certificates.\n";
+        return;
+    }
+    
+    config.cert.cert_path = expired_cert_path;
+    
+    CertState result = auth_manager->ensure_certificate(identity, config);
+    
+    assert(result == CertState::Failed && "Authentication should fail with expired certificate");
+    std::cout << "✓ Test passed: Expired certificate rejected correctly\n";
+}
+
+void test_malformed_certificate() {
+    std::cout << "\n=== Test: Malformed Certificate ===\n";
+    
+    auto auth_manager = create_auth_manager();
+    Config config = create_test_config();
+    Identity identity = create_test_identity();
+    
+    std::string agent_core_dir = get_agent_core_dir();
+    std::string malformed_cert_path = agent_core_dir + "/tests/fixtures/certs/malformed.pem";
+    
+    std::ifstream cert_file(malformed_cert_path);
+    if (!cert_file.good()) {
+        std::cout << "⚠ Skipping test: Malformed certificate file not found: " << malformed_cert_path << "\n";
+        std::cout << "  Run certificate generation script to create test certificates.\n";
+        return;
+    }
+    
+    config.cert.cert_path = malformed_cert_path;
+    
+    CertState result = auth_manager->ensure_certificate(identity, config);
+    
+    assert(result == CertState::Failed && "Authentication should fail with malformed certificate");
+    std::cout << "✓ Test passed: Malformed certificate rejected correctly\n";
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "Authentication Integration Tests\n";
@@ -169,6 +219,8 @@ int main() {
         test_missing_uuid();
         test_invalid_cert_path();
         test_invalid_backend_url();
+        test_expired_certificate();
+        test_malformed_certificate();
         
         std::cout << "\n========================================\n";
         std::cout << "All tests passed!\n";

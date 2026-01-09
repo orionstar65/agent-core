@@ -89,9 +89,9 @@ public:
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
         curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
         
-        // TLS/SSL options
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // Disable for self-signed certs
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L); // Disable hostname verification
+        // TLS/SSL options - Enable certificate verification
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
         
         // Timeout
         curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)request.timeout_ms);

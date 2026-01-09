@@ -11,6 +11,7 @@ set(AGENT_LIB_SOURCES
     ../src/net/net_path_selector.cpp
     ../src/net/https_client.cpp
     ../src/auth/auth_manager.cpp
+    ../src/auth/cert_validator.cpp
     ../src/reg/registration_ssm.cpp
     ../src/mqtt/mqtt_client.cpp
     ../src/bus/zmq_bus.cpp
@@ -50,7 +51,7 @@ add_executable(test_auth
 )
 
 target_include_directories(test_auth PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_auth PRIVATE CURL::libcurl)
+target_link_libraries(test_auth PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_auth PRIVATE ws2_32 psapi iphlpapi)
@@ -65,7 +66,7 @@ add_executable(test_zmq
 )
 
 target_include_directories(test_zmq PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_zmq PRIVATE CURL::libcurl)
+target_link_libraries(test_zmq PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 # ZeroMQ
 if(ZMQ_FOUND)
@@ -92,7 +93,7 @@ add_executable(test_zmq_load
 )
 
 target_include_directories(test_zmq_load PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_zmq_load PRIVATE CURL::libcurl)
+target_link_libraries(test_zmq_load PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 # ZeroMQ
 if(ZMQ_FOUND)
@@ -118,7 +119,7 @@ add_executable(test_ssm_registration
 )
 
 target_include_directories(test_ssm_registration PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl)
+target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_ssm_registration PRIVATE ws2_32 psapi iphlpapi)
@@ -133,7 +134,7 @@ add_executable(test_identity
 )
 
 target_include_directories(test_identity PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_identity PRIVATE CURL::libcurl)
+target_link_libraries(test_identity PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_identity PRIVATE ws2_32 psapi iphlpapi)
@@ -148,7 +149,7 @@ add_executable(test_restart_manager
 )
 
 target_include_directories(test_restart_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_restart_manager PRIVATE CURL::libcurl)
+target_link_libraries(test_restart_manager PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_restart_manager PRIVATE ws2_32 psapi iphlpapi)
@@ -163,7 +164,7 @@ add_executable(test_logging
 )
 
 target_include_directories(test_logging PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_logging PRIVATE CURL::libcurl)
+target_link_libraries(test_logging PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_logging PRIVATE ws2_32 psapi iphlpapi)
@@ -178,7 +179,7 @@ add_executable(test_log_throttler
 )
 
 target_include_directories(test_log_throttler PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_log_throttler PRIVATE CURL::libcurl)
+target_link_libraries(test_log_throttler PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_log_throttler PRIVATE ws2_32 psapi iphlpapi)
@@ -193,7 +194,7 @@ add_executable(test_retry_metrics
 )
 
 target_include_directories(test_retry_metrics PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl)
+target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_retry_metrics PRIVATE ws2_32 psapi iphlpapi)
@@ -208,7 +209,7 @@ add_executable(test_quota_enforcer
 )
 
 target_include_directories(test_quota_enforcer PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_quota_enforcer PRIVATE CURL::libcurl)
+target_link_libraries(test_quota_enforcer PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_quota_enforcer PRIVATE ws2_32 psapi iphlpapi)
@@ -223,7 +224,7 @@ add_executable(test_restart_quarantine
 )
 
 target_include_directories(test_restart_quarantine PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl)
+target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_restart_quarantine PRIVATE ws2_32 psapi iphlpapi)
@@ -238,7 +239,7 @@ integration/test_service_installer.cpp
 )
 
 target_include_directories(test_service_installer PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_service_installer PRIVATE CURL::libcurl)
+target_link_libraries(test_service_installer PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_service_installer PRIVATE ws2_32 psapi iphlpapi)
@@ -253,7 +254,7 @@ add_executable(test_logging_throttling
 )
 
 target_include_directories(test_logging_throttling PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl)
+target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_logging_throttling PRIVATE ws2_32 psapi iphlpapi)
@@ -268,7 +269,7 @@ add_executable(test_extension_manager
 )
 
 target_include_directories(test_extension_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_extension_manager PRIVATE CURL::libcurl)
+target_link_libraries(test_extension_manager PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_extension_manager PRIVATE ws2_32 psapi iphlpapi)
@@ -283,7 +284,7 @@ add_executable(test_extension_lifecycle
 )
 
 target_include_directories(test_extension_lifecycle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_extension_lifecycle PRIVATE CURL::libcurl)
+target_link_libraries(test_extension_lifecycle PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_extension_lifecycle PRIVATE ws2_32 psapi iphlpapi)
@@ -298,7 +299,7 @@ add_executable(test_health_format
 )
 
 target_include_directories(test_health_format PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_health_format PRIVATE CURL::libcurl)
+target_link_libraries(test_health_format PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_health_format PRIVATE ws2_32 psapi iphlpapi)
@@ -313,12 +314,27 @@ add_executable(test_telemetry
 )
 
 target_include_directories(test_telemetry PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_telemetry PRIVATE CURL::libcurl)
+target_link_libraries(test_telemetry PRIVATE CURL::libcurl OpenSSL::SSL OpenSSL::Crypto)
 
 if(WIN32)
     target_link_libraries(test_telemetry PRIVATE ws2_32 psapi iphlpapi)
 else()
     target_link_libraries(test_telemetry PRIVATE pthread)
+endif()
+
+# Unit test for Certificate Validator
+add_executable(test_cert_validator
+    unit/test_cert_validator.cpp
+    ../src/auth/cert_validator.cpp
+)
+
+target_include_directories(test_cert_validator PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(test_cert_validator PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+
+if(WIN32)
+    target_link_libraries(test_cert_validator PRIVATE ws2_32)
+else()
+    target_link_libraries(test_cert_validator PRIVATE pthread)
 endif()
 
 # Register tests with CTest and set working directory
@@ -337,6 +353,7 @@ add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECT
 add_test(NAME ExtensionManagerUnitTest COMMAND test_extension_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ExtensionLifecycleIntegrationTest COMMAND test_extension_lifecycle WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME HealthFormatUnitTest COMMAND test_health_format WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME CertValidatorUnitTest COMMAND test_cert_validator WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME TelemetryIntegrationTest COMMAND test_telemetry WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full
