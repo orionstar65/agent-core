@@ -1,6 +1,7 @@
 #include "agent/registration.hpp"
 #include "agent/https_client.hpp"
 #include "agent/retry.hpp"
+#include "agent/certificate_loader.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -31,11 +32,16 @@ public:
         
         std::cout << "  - URL: " << url << "\n";
         
-        std::string cert_content = read_certificate(config.cert.cert_path);
-        if (cert_content.empty()) {
-            std::cerr << "Registration: ERROR - Failed to read certificate\n";
+        CertificateLoadResult cert_result = load_certificate(config);
+        if (!cert_result.success || cert_result.certificate_content.empty()) {
+            std::cerr << "Registration: ERROR - Failed to load certificate\n";
+            if (!cert_result.error_message.empty()) {
+                std::cerr << "  " << cert_result.error_message << "\n";
+            }
             return false;
         }
+        
+        std::string cert_content = cert_result.certificate_content;
         
         HttpsRequest request;
         request.url = url;
@@ -141,11 +147,16 @@ public:
         
         std::cout << "  - URL: " << url << "\n";
         
-        std::string cert_content = read_certificate(config.cert.cert_path);
-        if (cert_content.empty()) {
-            std::cerr << "Registration: ERROR - Failed to read certificate\n";
+        CertificateLoadResult cert_result = load_certificate(config);
+        if (!cert_result.success || cert_result.certificate_content.empty()) {
+            std::cerr << "Registration: ERROR - Failed to load certificate\n";
+            if (!cert_result.error_message.empty()) {
+                std::cerr << "  " << cert_result.error_message << "\n";
+            }
             return false;
         }
+        
+        std::string cert_content = cert_result.certificate_content;
         
         HttpsRequest request;
         request.url = url;
@@ -285,22 +296,6 @@ public:
 private:
     std::unique_ptr<HttpsClient> https_client_;
     std::string ssm_agent_path_;
-    
-    std::string read_certificate(const std::string& cert_path) {
-        std::ifstream file(cert_path);
-        if (!file.is_open()) {
-            return "";
-        }
-        
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
-        
-        content.erase(0, content.find_first_not_of(" \t\r\n"));
-        content.erase(content.find_last_not_of(" \t\r\n") + 1);
-        
-        return content;
-    }
     
     bool parse_activation_info(const std::string& json_str, ActivationInfo& info) {
         auto extract_value = [](const std::string& json, const std::string& key) -> std::string {

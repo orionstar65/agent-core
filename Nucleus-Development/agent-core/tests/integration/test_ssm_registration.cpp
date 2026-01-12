@@ -1,6 +1,7 @@
 #include "agent/registration.hpp"
 #include "agent/config.hpp"
 #include "agent/identity.hpp"
+#include "agent/certificate_loader.hpp"
 #include <iostream>
 #include <cassert>
 #include <cstdlib>
@@ -57,19 +58,35 @@ std::string get_agent_core_dir() {
 // Test helper to create a test config
 Config create_test_config() {
     Config config;
-    std::string agent_core_dir = get_agent_core_dir();
     
     config.backend.base_url = "https://35.159.104.91:443";
     config.backend.auth_path = "/deviceservices/api/Authentication/devicecertificatevalid/";
     config.backend.is_registered_path = "/deviceservices/api/devicemanagement/isdeviceregistered/";
     config.backend.get_activation_path = "/deviceservices/api/devicemanagement/getactivationinformation/";
-    config.cert.cert_path = agent_core_dir + "/cert_base64(200000).txt";
     config.ssm.agent_path = "/snap/amazon-ssm-agent/current/amazon-ssm-agent";
     config.retry.max_attempts = 3;
     config.retry.base_ms = 500;
     config.retry.max_ms = 5000;
     
-    std::cout << "Using certificate path: " << config.cert.cert_path << "\n";
+    // Use environment variable if set, otherwise try test certificate path
+    const char* env_cert_path = std::getenv("AGENT_CERT_PATH");
+    if (env_cert_path && strlen(env_cert_path) > 0) {
+        config.cert.cert_path = std::string(env_cert_path);
+        std::cout << "Using certificate from AGENT_CERT_PATH: " << config.cert.cert_path << "\n";
+    } else {
+        std::string agent_core_dir = get_agent_core_dir();
+        std::string test_cert_path = agent_core_dir + "/cert_base64(200000).txt";
+        config.cert.cert_path = test_cert_path;
+        
+        // Set environment variable for this test session
+        #ifdef _WIN32
+        _putenv_s("AGENT_CERT_PATH", test_cert_path.c_str());
+        #else
+        setenv("AGENT_CERT_PATH", test_cert_path.c_str(), 1);
+        #endif
+        
+        std::cout << "Using test certificate path: " << config.cert.cert_path << "\n";
+    }
     
     return config;
 }
@@ -157,7 +174,16 @@ void test_get_activation_info_invalid_cert() {
     
     auto registration = create_ssm_registration();
     Config config = create_test_config();
+    
+    // Unset environment variable for this test
+    #ifdef _WIN32
+    _putenv_s("AGENT_CERT_PATH", "");
+    #else
+    unsetenv("AGENT_CERT_PATH");
+    #endif
+    
     config.cert.cert_path = "/nonexistent/path/cert.txt";
+    config.cert.store_hint = "FILE";
     Identity identity = create_test_identity();
     
     ActivationInfo info;
@@ -165,6 +191,9 @@ void test_get_activation_info_invalid_cert() {
     
     assert(!result && "Should fail with invalid certificate path");
     std::cout << "✓ Test passed: Invalid certificate path handled correctly\n";
+    
+    // Restore environment variable
+    Config restore_config = create_test_config();
 }
 
 void test_register_with_ssm_invalid_info() {

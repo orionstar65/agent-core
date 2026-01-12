@@ -1,6 +1,7 @@
 #include "agent/auth_manager.hpp"
 #include "agent/https_client.hpp"
 #include "agent/retry.hpp"
+#include "agent/certificate_loader.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -31,17 +32,21 @@ public:
             return CertState::Failed;
         }
         
-        // Read certificate from file
-        std::string cert_content = read_certificate(config.cert.cert_path);
-        if (cert_content.empty()) {
-            std::cerr << "AuthManager: ERROR - Failed to read certificate from: "
-                      << config.cert.cert_path << "\n";
+        // Load certificate using certificate loader
+        CertificateLoadResult cert_result = load_certificate(config);
+        if (!cert_result.success || cert_result.certificate_content.empty()) {
+            std::cerr << "AuthManager: ERROR - Failed to load certificate\n";
+            if (!cert_result.error_message.empty()) {
+                std::cerr << "  " << cert_result.error_message << "\n";
+            }
             return CertState::Failed;
         }
         
+        std::string cert_content = cert_result.certificate_content;
+        
         std::cout << "  - Serial Number: " << serial_number << "\n";
         std::cout << "  - UUID: " << uuid << "\n";
-        std::cout << "  - Certificate loaded from: " << config.cert.cert_path << "\n";
+        std::cout << "  - Certificate loaded from: " << cert_result.source_description << "\n";
         std::cout << "  - Backend URL: " << config.backend.base_url << "\n";
         
         // Build authentication URL
@@ -135,24 +140,6 @@ public:
 
 private:
     std::unique_ptr<HttpsClient> https_client_;
-    
-    std::string read_certificate(const std::string& cert_path) {
-        std::ifstream file(cert_path);
-        if (!file.is_open()) {
-            std::cerr << "Failed to open certificate file: " << cert_path << "\n";
-            return "";
-        }
-        
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
-        
-        // Trim whitespace
-        content.erase(0, content.find_first_not_of(" \t\r\n"));
-        content.erase(content.find_last_not_of(" \t\r\n") + 1);
-        
-        return content;
-    }
 };
 
 std::unique_ptr<AuthManager> create_auth_manager() {

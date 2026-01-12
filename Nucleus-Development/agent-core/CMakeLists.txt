@@ -25,6 +25,11 @@ endif()
 # Find required packages
 find_package(CURL REQUIRED)
 
+# Find OpenSSL for certificate operations (Linux)
+if(NOT WIN32)
+    find_package(OpenSSL REQUIRED)
+endif()
+
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -42,6 +47,7 @@ set(AGENT_CORE_SOURCES
     src/net/net_path_selector.cpp
     src/net/https_client.cpp
     src/auth/auth_manager.cpp
+    src/auth/certificate_loader.cpp
     src/reg/registration_ssm.cpp
     src/mqtt/mqtt_client.cpp
     src/bus/zmq_bus.cpp
@@ -82,9 +88,9 @@ target_link_libraries(agent-core PRIVATE CURL::libcurl)
 
 # Platform-specific libraries
 if(WIN32)
-    target_link_libraries(agent-core PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(agent-core PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(agent-core PRIVATE pthread)
+    target_link_libraries(agent-core PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # ZeroMQ

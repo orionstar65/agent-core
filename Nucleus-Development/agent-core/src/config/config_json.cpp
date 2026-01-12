@@ -81,10 +81,23 @@ std::unique_ptr<Config> load_config(const std::string& path) {
                 config->cert.store_hint = cert["storeHint"].get<std::string>();
             }
             if (cert.contains("certPath")) {
-                config->cert.cert_path = cert["certPath"].get<std::string>();
+                std::string cert_path = cert["certPath"].get<std::string>();
+                if (!cert_path.empty() && cert_path != "./cert_base64(200000).txt" && 
+                    cert_path.find("cert_base64") == std::string::npos) {
+                    config->cert.cert_path = cert_path;
+                }
             }
             if (cert.contains("renewDays")) {
                 config->cert.renew_days = cert["renewDays"].get<int>();
+            }
+            if (cert.contains("storeLocation")) {
+                config->cert.store_location = cert["storeLocation"].get<std::string>();
+            }
+            if (cert.contains("subjectName")) {
+                config->cert.subject_name = cert["subjectName"].get<std::string>();
+            }
+            if (cert.contains("thumbprint")) {
+                config->cert.thumbprint = cert["thumbprint"].get<std::string>();
             }
         }
         
@@ -282,7 +295,10 @@ std::unique_ptr<Config> load_config(const std::string& path) {
         std::cout << "  Backend URL: " << config->backend.base_url << "\n";
         std::cout << "  Device Serial: " << config->identity.device_serial << "\n";
         std::cout << "  UUID: " << config->identity.uuid << "\n";
-        std::cout << "  Cert Path: " << config->cert.cert_path << "\n";
+        std::cout << "  Cert Store Hint: " << config->cert.store_hint << "\n";
+        if (!config->cert.cert_path.empty()) {
+            std::cout << "  Cert Path: " << config->cert.cert_path << "\n";
+        }
         std::cout << "  Tunnel Enabled: " << (config->tunnel.enabled ? "true" : "false") << "\n";
         
     } catch (const json::exception& e) {

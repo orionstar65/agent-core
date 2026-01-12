@@ -1,6 +1,7 @@
 #include "agent/auth_manager.hpp"
 #include "agent/config.hpp"
 #include "agent/identity.hpp"
+#include "agent/certificate_loader.hpp"
 #include <iostream>
 #include <cassert>
 #include <cstdlib>
@@ -58,14 +59,30 @@ std::string get_agent_core_dir() {
 // Test helper to create a test config
 Config create_test_config() {
     Config config;
-    std::string agent_core_dir = get_agent_core_dir();
     
     config.backend.base_url = "https://35.159.104.91:443";
     config.backend.auth_path = "/deviceservices/api/Authentication/devicecertificatevalid/";
-    config.cert.cert_path = agent_core_dir + "/cert_base64(200000).txt";
     config.retry.max_attempts = 3;
     config.retry.base_ms = 500;
     config.retry.max_ms = 5000;
+    
+    // Use environment variable if set, otherwise try test certificate path
+    const char* env_cert_path = std::getenv("AGENT_CERT_PATH");
+    if (env_cert_path && strlen(env_cert_path) > 0) {
+        config.cert.cert_path = std::string(env_cert_path);
+    } else {
+        std::string agent_core_dir = get_agent_core_dir();
+        std::string test_cert_path = agent_core_dir + "/cert_base64(200000).txt";
+        config.cert.cert_path = test_cert_path;
+        
+        // Set environment variable for this test session
+        #ifdef _WIN32
+        _putenv_s("AGENT_CERT_PATH", test_cert_path.c_str());
+        #else
+        setenv("AGENT_CERT_PATH", test_cert_path.c_str(), 1);
+        #endif
+    }
+    
     return config;
 }
 
@@ -85,10 +102,20 @@ void test_successful_authentication() {
     Config config = create_test_config();
     Identity identity = create_test_identity();
     
-    // Check if certificate file exists, skip test if it doesn't
-    std::ifstream cert_file(config.cert.cert_path);
-    if (!cert_file.good()) {
-        std::cout << "⚠ Skipping test: Certificate file not found: " << config.cert.cert_path << "\n";
+    // Validate certificate configuration first
+    std::string cert_error;
+    if (!validate_certificate_configuration(config, cert_error)) {
+        std::cout << "⚠ Skipping test: Certificate configuration invalid: " << cert_error << "\n";
+        std::cout << "  This test requires a valid certificate configuration to run.\n";
+        std::cout << "  Set AGENT_CERT_PATH environment variable or provide certificate in config.\n";
+        return;
+    }
+    
+    // Try to load certificate to verify it's accessible
+    CertificateLoadResult cert_result = load_certificate(config);
+    if (!cert_result.success || cert_result.certificate_content.empty()) {
+        std::cout << "⚠ Skipping test: Certificate not found or unreadable\n";
+        std::cout << "  " << cert_result.error_message << "\n";
         std::cout << "  This test requires a valid certificate file to run.\n";
         return;
     }
@@ -135,13 +162,25 @@ void test_invalid_cert_path() {
     
     auto auth_manager = create_auth_manager();
     Config config = create_test_config();
+    
+    // Unset environment variable for this test
+    #ifdef _WIN32
+    _putenv_s("AGENT_CERT_PATH", "");
+    #else
+    unsetenv("AGENT_CERT_PATH");
+    #endif
+    
     config.cert.cert_path = "/nonexistent/path/cert.txt";
+    config.cert.store_hint = "FILE";
     Identity identity = create_test_identity();
     
     CertState result = auth_manager->ensure_certificate(identity, config);
     
     assert(result == CertState::Failed && "Authentication should fail with invalid cert path");
     std::cout << "✓ Test passed: Invalid certificate path handled correctly\n";
+    
+    // Restore environment variable
+    Config restore_config = create_test_config();
 }
 
 void test_invalid_backend_url() {

@@ -17,6 +17,7 @@
 #include "agent/restart_manager.hpp"
 #include "agent/restart_state_store.hpp"
 #include "agent/service_installer.hpp"
+#include "agent/certificate_loader.hpp"
 
 #include <iostream>
 #include <memory>
@@ -90,6 +91,25 @@ public:
         
         // Create retry policy with metrics
         retry_policy_ = create_retry_policy(config_->retry, metrics_.get());
+        
+        // Validate certificate configuration early
+        std::string cert_error;
+        if (!validate_certificate_configuration(*config_, cert_error)) {
+            log(LogLevel::Error, "Core", "Certificate configuration validation failed: " + cert_error);
+            std::cerr << "ERROR: Certificate configuration is missing or invalid.\n";
+            std::cerr << "  " << cert_error << "\n";
+            std::cerr << "\nAvailable options:\n";
+            std::cerr << "  1. Set AGENT_CERT_PATH environment variable pointing to your certificate file\n";
+            std::cerr << "  2. Configure OS certificate store (storeHint: \"OS\")\n";
+            std::cerr << "  3. Place certificate in installer-provisioned location:\n";
+#ifdef _WIN32
+            std::cerr << "     - Windows: %PROGRAMDATA%\\AgentCore\\certificates\\\n";
+#else
+            std::cerr << "     - Linux: /etc/agent-core/certificates/ or /var/lib/agent-core/certificates/\n";
+#endif
+            std::cerr << "  4. Specify certPath in config file (not recommended for dev.json)\n";
+            return false;
+        }
         
         // Discover identity
         current_state_ = AgentState::IDENTITY_RESOLVE;

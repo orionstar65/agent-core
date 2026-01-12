@@ -93,7 +93,7 @@ Key configuration sections:
 - `identity`: Device/Gateway identification (serial number, UUID)
 - `tunnelInfo`: Tunnel extension control
 - `mqtt`: MQTT broker settings
-- `cert`: Certificate management (path to certificate file)
+- `cert`: Certificate management (OS store, environment variable, or explicit path)
 - `retry`: Backoff and circuit breaker (max attempts, delays)
 - `resource`: CPU/Memory/Network budgets with three-stage enforcement policy with three-stage enforcement policy
 - `logging`: Log level, format (json/text), and throttling configuration
@@ -117,13 +117,278 @@ For gateway mode (`isGateway=true`), if standard identity fields are missing, a 
 
 Agent Core authenticates with the backend using X.509 certificates:
 
-1. Certificate is loaded from the path specified in `cert.certPath`
+1. Certificate is loaded using secure certificate configuration (see Certificate Configuration below)
 2. HTTPS GET request is sent to `backend.baseUrl + backend.authPath + serialNumber + uuid`
 3. Certificate is passed in the `ARS-ClientCert` header
 4. Request includes device metadata in JSON body
 5. Response 200 indicates successful authentication
 6. Network errors and 5xx errors are retried according to retry policy
 7. 4xx errors (client errors) are not retried
+
+### Certificate Configuration
+
+Agent Core supports multiple secure methods for certificate provisioning, with the following priority order:
+
+1. **Environment Variable** (`AGENT_CERT_PATH`) - Highest priority, recommended for local development
+2. **OS Certificate Store** - Production-ready secure storage (Windows Certificate Store, Linux OpenSSL store)
+3. **Installer-Provisioned Location** - Platform-specific secure paths with appropriate ACLs
+4. **Explicit Config Path** - Fallback only, not recommended for dev.json
+
+#### Certificate Configuration for Local Development
+
+**IMPORTANT**: Agent Core requires a valid X.509 certificate for authentication. The certificate must be provisioned securely and must not be committed to source control.
+
+**Option 1: Environment Variable (Recommended for Local Development)**
+
+The easiest way to configure certificates for local development is using the `AGENT_CERT_PATH` environment variable:
+
+**Linux/macOS:**
+```bash
+# Set environment variable
+export AGENT_CERT_PATH=/path/to/your/certificate.txt
+
+# Verify it's set
+echo $AGENT_CERT_PATH
+
+# Run agent-core
+./build/agent-core --config ./config/dev.json
+```
+
+**Windows (Command Prompt):**
+```cmd
+REM Set environment variable
+set AGENT_CERT_PATH=C:\path\to\your\certificate.txt
+
+REM Verify it's set
+echo %AGENT_CERT_PATH%
+
+REM Run agent-core
+build\agent-core.exe --config config\dev.json
+```
+
+**Windows (PowerShell):**
+```powershell
+# Set environment variable for current session
+$env:AGENT_CERT_PATH="C:\path\to\your\certificate.txt"
+
+# Verify it's set
+echo $env:AGENT_CERT_PATH
+
+# Run agent-core
+.\build\agent-core.exe --config .\config\dev.json
+```
+
+**Option 2: Place Certificate in Installer-Provisioned Location**
+
+**Linux:**
+```bash
+# Create certificate directory (requires root)
+sudo mkdir -p /etc/agent-core/certificates
+
+# Copy your certificate to the directory
+sudo cp /path/to/your/certificate.txt /etc/agent-core/certificates/
+
+# Set proper permissions (owner read/write only)
+sudo chmod 600 /etc/agent-core/certificates/certificate.txt
+
+# Set ownership (optional, but recommended)
+sudo chown root:root /etc/agent-core/certificates/certificate.txt
+```
+
+**Note**: If `/etc/agent-core/certificates/` is not accessible, Agent Core will fall back to `/var/lib/agent-core/certificates/`.
+
+**Windows:**
+```powershell
+# Create certificate directory (requires Administrator)
+New-Item -ItemType Directory -Force -Path "$env:PROGRAMDATA\AgentCore\certificates"
+
+# Copy your certificate to the directory
+Copy-Item "C:\path\to\your\certificate.txt" "$env:PROGRAMDATA\AgentCore\certificates\"
+
+# Set restrictive ACL (requires Administrator)
+$certPath = "$env:PROGRAMDATA\AgentCore\certificates\certificate.txt"
+$acl = Get-Acl $certPath
+$acl.SetAccessRuleProtection($true, $false)
+$acl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule("Administrators", "FullControl", "Allow")))
+$acl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule("SYSTEM", "FullControl", "Allow")))
+Set-Acl $certPath $acl
+```
+
+#### OS Certificate Store Configuration
+
+For production deployments, configure certificates in the OS certificate store:
+
+**Windows:**
+- Use Windows Certificate Store (MY store)
+- Configure `storeLocation`: "LOCAL_MACHINE" or "CURRENT_USER"
+- Configure `subjectName` or `thumbprint` for certificate lookup
+- Example config:
+```json
+{
+  "cert": {
+    "storeHint": "OS",
+    "storeLocation": "LOCAL_MACHINE",
+    "subjectName": "CN=YourCertificateName"
+  }
+}
+```
+
+**Step-by-step Windows Certificate Store Setup:**
+1. Import certificate into Windows Certificate Store:
+   - Open Certificate Manager (certmgr.msc)
+   - Right-click on "Personal" → "Certificates" → "All Tasks" → "Import"
+   - Follow the wizard to import your certificate
+2. Configure `config/dev.json` with the certificate subject name or thumbprint
+
+**Linux:**
+- Use OpenSSL certificate store
+- Certificates should be placed in system certificate locations: `/etc/ssl/certs/`, `/usr/share/ca-certificates/`
+- Configure `subjectName` or `thumbprint` for certificate lookup
+- Example config:
+```json
+{
+  "cert": {
+    "storeHint": "OS",
+    "storeLocation": "SYSTEM",
+    "subjectName": "CN=YourCertificateName"
+  }
+}
+```
+
+**Step-by-step Linux OS Certificate Store Setup:**
+```bash
+# Copy certificate to system certificate directory
+sudo cp /path/to/your/certificate.crt /usr/share/ca-certificates/agent-core/
+
+# Update CA certificate database
+sudo update-ca-certificates
+```
+
+#### Installer-Provisioned Certificate Locations
+
+When certificates are provisioned by an installer:
+
+**Windows:**
+- Default location: `%PROGRAMDATA%\AgentCore\certificates\`
+- Requires Administrator privileges
+- ACLs should restrict access to Administrators and SYSTEM only
+
+**Linux:**
+- Primary location: `/etc/agent-core/certificates/` (system-wide, requires root)
+- Fallback location: `/var/lib/agent-core/certificates/` (application data)
+- File permissions should be `chmod 600`
+- Ownership should be root or the agent service account
+
+#### Certificate Validation at Startup
+
+Agent Core validates certificate configuration at startup and fails fast with a clear error message if:
+- No `AGENT_CERT_PATH` environment variable is set
+- No OS certificate is found (when `storeHint="OS"`)
+- No installer-provisioned certificate is found
+- No explicit `certPath` is provided in config
+
+The error message will indicate all available certificate configuration options.
+
+#### Certificate File Format
+
+The certificate file should be in PEM format (base64-encoded), which can be:
+- A `.pem` file containing the certificate
+- A `.crt` file containing the certificate  
+- A `.txt` file containing base64-encoded certificate content
+
+Example certificate content (PEM format):
+```
+-----BEGIN CERTIFICATE-----
+MIIFXTCCBEWgAwIBAgIJAK...
+(base64-encoded certificate content)
+...==
+-----END CERTIFICATE-----
+```
+
+Or as a single-line base64 string (for files named `cert_base64*.txt`):
+```
+MIIFXTCCBEWgAwIBAgIJAK...
+```
+
+#### Security Best Practices
+
+**DO:**
+- ✅ Use `AGENT_CERT_PATH` environment variable for local development
+- ✅ Place certificates in secure locations with restrictive permissions
+- ✅ Use OS certificate stores for production deployments
+- ✅ Verify certificate files are not committed to git (already in `.gitignore`)
+- ✅ Use installer-provisioned locations with proper ACLs/permissions
+- ✅ Set file permissions to `600` on Linux (owner read/write only)
+- ✅ Use restrictive ACLs on Windows (Administrators and SYSTEM only)
+
+**DON'T:**
+- ❌ Commit certificate files to source control
+- ❌ Hardcode certificate paths in `dev.json` or other config files in the repository
+- ❌ Store certificates in user-writable locations in production
+- ❌ Share certificate files via insecure channels
+- ❌ Use world-readable certificate files
+- ❌ Place certificates in the repository directory structure
+
+#### Troubleshooting Certificate Issues
+
+**Certificate Not Found Error:**
+
+If you see an error like "Certificate configuration is missing or invalid", check:
+
+1. **Environment variable is set correctly:**
+   ```bash
+   # Linux/macOS
+   echo $AGENT_CERT_PATH
+   
+   # Windows
+   echo %AGENT_CERT_PATH%  # Command Prompt
+   $env:AGENT_CERT_PATH    # PowerShell
+   ```
+
+2. **Certificate file exists and is readable:**
+   ```bash
+   # Linux/macOS
+   ls -l $AGENT_CERT_PATH
+   
+   # Windows
+   dir "%AGENT_CERT_PATH%"  # Command Prompt
+   Test-Path $env:AGENT_CERT_PATH  # PowerShell
+   ```
+
+3. **Certificate file permissions are correct:**
+   ```bash
+   # Linux/macOS - should show 600 or similar restrictive permissions
+   ls -l $AGENT_CERT_PATH
+   
+   # If permissions are wrong, fix them:
+   chmod 600 $AGENT_CERT_PATH
+   ```
+
+**Certificate Load Failure:**
+
+If certificate loading fails:
+1. Check certificate file format (should be PEM or base64-encoded)
+2. Verify certificate is not corrupted
+3. Check certificate file encoding (should be UTF-8 or ASCII)
+4. Ensure certificate file doesn't have extra whitespace or BOM markers
+
+**Windows Certificate Store Access Issues:**
+
+If using Windows Certificate Store:
+1. Verify certificate is imported into the correct store (Personal/Certificates)
+2. Check store location matches config (`LOCAL_MACHINE` vs `CURRENT_USER`)
+3. Verify certificate subject name or thumbprint matches config
+4. Ensure running process has permissions to access the certificate store
+
+**Linux Certificate Store Access Issues:**
+
+If using Linux certificate store:
+1. Verify certificate is in a standard location (`/etc/ssl/certs/`, `/usr/share/ca-certificates/`)
+2. Check certificate file permissions
+3. Verify OpenSSL can read the certificate:
+   ```bash
+   openssl x509 -in /path/to/certificate.crt -text -noout
+   ```
 
 ### SSM Registration
 
@@ -160,7 +425,7 @@ After successful authentication, Agent Core registers with AWS Systems Manager:
     "uuid": "a1635025-2723-4ffa-b608-208578d6128f"
   },
   "cert": {
-    "certPath": "./cert_base64(200000).txt"
+    "storeHint": "OS"
   },
   "retry": {
     "maxAttempts": 5,
@@ -618,11 +883,29 @@ ctest --test-dir build --output-on-failure
 - `test_retry_metrics` - Retry metrics unit tests
 - `test_quota_enforcer` - Resource quota enforcement unit tests
 - `test_logging_throttling` - Logging and throttling integration tests
-- `test_auth` - Authentication integration tests (requires network connectivity and certificate file)
+- `test_auth` - Authentication integration tests (requires network connectivity and certificate configuration via `AGENT_CERT_PATH`)
 - `test_identity` - Identity discovery tests (config override, JSON fallback, gateway mode, registry)
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
 - `test_zmq_load` - ZeroMQ load tests (10k msgs/min, PUB/SUB, REQ/REP, soak test)
-- `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
+- `test_ssm_registration` - SSM registration integration tests (requires certificate configuration via `AGENT_CERT_PATH`, some tests require sudo)
+
+**Integration Test Certificate Setup:**
+
+Integration tests (`test_auth`, `test_ssm_registration`) require certificate configuration:
+
+```bash
+# Set certificate path for tests
+export AGENT_CERT_PATH=/path/to/test/certificate.txt
+
+# Run authentication integration test
+./build/tests/test_auth
+
+# Run SSM registration integration test (without full registration)
+./build/tests/test_ssm_registration
+
+# Run SSM registration integration test with full registration (requires sudo)
+sudo ./build/tests/test_ssm_registration --full
+```
 
 ### ZeroMQ Integration Test
 
@@ -716,9 +999,15 @@ The test will verify:
 
 **Prerequisites:**
 - Network connectivity to backend API
-- Valid certificate file at `cert_base64(200000).txt`
-- AWS SSM Agent installed (for full registration test)
+- Certificate configured via `AGENT_CERT_PATH` environment variable or one of the secure configuration methods
+- AWS SSM Agent installed (for full registration test with `--full` flag)
 - Backend API accessible at configured URL
+
+**Certificate Setup for Tests:**
+```bash
+# Set certificate path before running tests
+export AGENT_CERT_PATH=/path/to/your/certificate.txt
+```
 
 ### Chaos Testing
 ```bash

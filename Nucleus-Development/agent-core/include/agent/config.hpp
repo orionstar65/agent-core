@@ -36,6 +36,9 @@ struct Config {
         std::string store_hint{"OS"};
         int renew_days{30};
         std::string cert_path;
+        std::string store_location;
+        std::string subject_name;
+        std::string thumbprint;
     } cert;
 
     struct Retry {

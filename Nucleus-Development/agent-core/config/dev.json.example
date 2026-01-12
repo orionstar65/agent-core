@@ -1,26 +1,29 @@
 {
   "backend": {
-    "baseUrl": "https://35.159.104.91:443",
+    "baseUrl": "https://api.example.com:443",
     "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/",
     "isRegisteredPath": "/deviceservices/api/devicemanagement/isdeviceregistered/",
     "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/"
   },
   "identity": {
     "isGateway": false,
-    "deviceSerial": "200000",
+    "deviceSerial": "YOUR_DEVICE_SERIAL",
     "gatewayId": "",
-    "uuid": "a1635025-2723-4ffa-b608-208578d6128f"
+    "uuid": "YOUR_UUID"
   },
   "tunnelInfo": {
     "enabled": false
   },
   "mqtt": {
-    "host": "mqtt.nucleus.example",
+    "host": "mqtt.example.com",
     "port": 8883,
     "keepalive": 30
   },
   "cert": {
-    "storeHint": "OS"
+    "storeHint": "OS",
+    "storeLocation": "",
+    "subjectName": "",
+    "thumbprint": ""
   },
   "retry": {
     "maxAttempts": 5,

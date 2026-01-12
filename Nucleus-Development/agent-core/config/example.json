@@ -21,7 +21,9 @@
   },
   "cert": {
     "storeHint": "OS",
-    "certPath": "./cert_base64.txt"
+    "storeLocation": "",
+    "subjectName": "",
+    "thumbprint": ""
   },
   "retry": {
     "maxAttempts": 5,

@@ -11,6 +11,7 @@ set(AGENT_LIB_SOURCES
     ../src/net/net_path_selector.cpp
     ../src/net/https_client.cpp
     ../src/auth/auth_manager.cpp
+    ../src/auth/certificate_loader.cpp
     ../src/reg/registration_ssm.cpp
     ../src/mqtt/mqtt_client.cpp
     ../src/bus/zmq_bus.cpp
@@ -53,9 +54,9 @@ target_include_directories(test_auth PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_auth PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_auth PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_auth PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_auth PRIVATE pthread)
+    target_link_libraries(test_auth PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for ZeroMQ
@@ -80,9 +81,9 @@ if(ZMQ_FOUND)
 endif()
 
 if(WIN32)
-    target_link_libraries(test_zmq PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_zmq PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_zmq PRIVATE pthread)
+    target_link_libraries(test_zmq PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # ZeroMQ load test
@@ -106,9 +107,9 @@ if(ZMQ_FOUND)
 endif()
 
 if(WIN32)
-    target_link_libraries(test_zmq_load PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_zmq_load PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_zmq_load PRIVATE pthread)
+    target_link_libraries(test_zmq_load PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for SSM Registration
@@ -121,9 +122,9 @@ target_include_directories(test_ssm_registration PRIVATE ${CMAKE_SOURCE_DIR}/inc
 target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_ssm_registration PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_ssm_registration PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_ssm_registration PRIVATE pthread)
+    target_link_libraries(test_ssm_registration PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Identity discovery test
@@ -136,9 +137,9 @@ target_include_directories(test_identity PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_identity PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_identity PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_identity PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_identity PRIVATE pthread)
+    target_link_libraries(test_identity PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for RestartManager
@@ -151,9 +152,9 @@ target_include_directories(test_restart_manager PRIVATE ${CMAKE_SOURCE_DIR}/incl
 target_link_libraries(test_restart_manager PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_restart_manager PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_restart_manager PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_restart_manager PRIVATE pthread)
+    target_link_libraries(test_restart_manager PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for Structured Logging
@@ -166,9 +167,9 @@ target_include_directories(test_logging PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_logging PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_logging PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_logging PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_logging PRIVATE pthread)
+    target_link_libraries(test_logging PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for Log Throttler
@@ -181,9 +182,9 @@ target_include_directories(test_log_throttler PRIVATE ${CMAKE_SOURCE_DIR}/includ
 target_link_libraries(test_log_throttler PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_log_throttler PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_log_throttler PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_log_throttler PRIVATE pthread)
+    target_link_libraries(test_log_throttler PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for Retry Metrics
@@ -196,9 +197,9 @@ target_include_directories(test_retry_metrics PRIVATE ${CMAKE_SOURCE_DIR}/includ
 target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_retry_metrics PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_retry_metrics PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_retry_metrics PRIVATE pthread)
+    target_link_libraries(test_retry_metrics PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for Quota Enforcer
@@ -211,9 +212,9 @@ target_include_directories(test_quota_enforcer PRIVATE ${CMAKE_SOURCE_DIR}/inclu
 target_link_libraries(test_quota_enforcer PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_quota_enforcer PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_quota_enforcer PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_quota_enforcer PRIVATE pthread)
+    target_link_libraries(test_quota_enforcer PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for Restart/Quarantine
@@ -226,9 +227,9 @@ target_include_directories(test_restart_quarantine PRIVATE ${CMAKE_SOURCE_DIR}/i
 target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_restart_quarantine PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_restart_quarantine PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_restart_quarantine PRIVATE pthread)
+    target_link_libraries(test_restart_quarantine PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for Service Installer
@@ -241,9 +242,9 @@ target_include_directories(test_service_installer PRIVATE ${CMAKE_SOURCE_DIR}/in
 target_link_libraries(test_service_installer PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_service_installer PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_service_installer PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_service_installer PRIVATE pthread)
+    target_link_libraries(test_service_installer PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for Logging & Throttling
@@ -256,9 +257,9 @@ target_include_directories(test_logging_throttling PRIVATE ${CMAKE_SOURCE_DIR}/i
 target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_logging_throttling PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_logging_throttling PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_logging_throttling PRIVATE pthread)
+    target_link_libraries(test_logging_throttling PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for ExtensionManager
@@ -271,9 +272,9 @@ target_include_directories(test_extension_manager PRIVATE ${CMAKE_SOURCE_DIR}/in
 target_link_libraries(test_extension_manager PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_extension_manager PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_extension_manager PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_extension_manager PRIVATE pthread)
+    target_link_libraries(test_extension_manager PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for Extension Lifecycle
@@ -286,9 +287,9 @@ target_include_directories(test_extension_lifecycle PRIVATE ${CMAKE_SOURCE_DIR}/
 target_link_libraries(test_extension_lifecycle PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_extension_lifecycle PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_extension_lifecycle PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_extension_lifecycle PRIVATE pthread)
+    target_link_libraries(test_extension_lifecycle PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Unit test for Health Response Format
@@ -301,9 +302,9 @@ target_include_directories(test_health_format PRIVATE ${CMAKE_SOURCE_DIR}/includ
 target_link_libraries(test_health_format PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_health_format PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_health_format PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_health_format PRIVATE pthread)
+    target_link_libraries(test_health_format PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Integration test for Telemetry
@@ -316,9 +317,9 @@ target_include_directories(test_telemetry PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(test_telemetry PRIVATE CURL::libcurl)
 
 if(WIN32)
-    target_link_libraries(test_telemetry PRIVATE ws2_32 psapi iphlpapi)
+    target_link_libraries(test_telemetry PRIVATE ws2_32 psapi iphlpapi crypt32)
 else()
-    target_link_libraries(test_telemetry PRIVATE pthread)
+    target_link_libraries(test_telemetry PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 # Register tests with CTest and set working directory
