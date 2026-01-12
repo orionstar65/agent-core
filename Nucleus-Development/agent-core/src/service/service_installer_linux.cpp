@@ -54,11 +54,25 @@ public:
         
         system(("chmod 755 " + install_binary).c_str());
         
+        // Determine config directory for copying related files
+        std::string config_dir;
+        size_t last_slash = config_path.find_last_of("/");
+        if (last_slash != std::string::npos) {
+            config_dir = config_path.substr(0, last_slash);
+        } else {
+            config_dir = ".";
+        }
+        
         // Copy config if provided and doesn't exist
         if (!config_path.empty() && access("/etc/agent-core/config.json", F_OK) != 0) {
             std::string cp_config = "cp \"" + config_path + "\" /etc/agent-core/config.json";
             system(cp_config.c_str());
         }
+        
+        // Copy cert files from config directory to /etc/agent-core/
+        // This ensures relative cert paths in config work from WorkingDirectory
+        std::string cp_certs = "cp \"" + config_dir + "\"/../cert*.txt /etc/agent-core/ 2>/dev/null || true";
+        system(cp_certs.c_str());
         
         // Create systemd service file
         std::ofstream service_file("/etc/systemd/system/agent-core.service");
@@ -74,18 +88,24 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+Environment="LD_LIBRARY_PATH=/usr/local/lib"
+WorkingDirectory=/etc/agent-core
 ExecStart=/usr/local/bin/agent-core --config /etc/agent-core/config.json
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
+# Runtime directory for IPC sockets (creates /run/agent-core/)
+RuntimeDirectory=agent-core
+RuntimeDirectoryMode=0755
+
 # Security hardening
-NoNewPrivileges=true
+NoNewPrivileges=false
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/agent-core
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/lib/agent-core /var/lib/amazon /var/log/amazon /etc/amazon
 
 # Resource limits
 CPUQuota=60%

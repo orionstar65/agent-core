@@ -5,6 +5,7 @@
 #include "agent/net_path_selector.hpp"
 #include "agent/auth_manager.hpp"
 #include "agent/registration.hpp"
+#include "agent/comm_info.hpp"
 #include "agent/mqtt_client.hpp"
 #include "agent/bus.hpp"
 #include "agent/extension_manager.hpp"
@@ -140,11 +141,22 @@ public:
     }
     
     void run(ServiceHost& service_host, RestartManager* restart_mgr, RestartStateStore* restart_store) {
+        // Fetch AWS IoT communication credentials
+        log(LogLevel::Info, "Core", "Fetching AWS IoT communication credentials");
+        
+        auto comm_info_mgr = create_comm_info_manager();
+        CommunicationInfo comm_info;
+        
+        if (!comm_info_mgr->fetch_comm_info(identity_, *config_, comm_info)) {
+            log(LogLevel::Error, "Core", "Failed to fetch communication info");
+            return;
+        }
+        
         // MQTT Connection
         current_state_ = AgentState::MQTT_CONNECT;
         log(LogLevel::Info, "Core", "Connecting to MQTT broker");
         
-        if (!mqtt_client_->connect(*config_, identity_)) {
+        if (!mqtt_client_->connect(comm_info, identity_, *config_)) {
             log(LogLevel::Error, "Core", "MQTT connection failed");
             return;
         }
@@ -155,6 +167,15 @@ public:
             [this](const MqttMsg& msg) {
                 handle_command(msg);
             });
+        
+        // Subscribe to STATUS_REQUEST topic (from config)
+        std::string status_req_topic = config_->mqtt.topics.status_request + "/" + identity_.device_serial + "_" + identity_.uuid;
+        mqtt_client_->subscribe(status_req_topic,
+            [this](const MqttMsg& msg) {
+                handle_status_request(msg);
+            });
+        
+        log(LogLevel::Info, "MQTT", "Subscribed to STATUS_REQUEST topic: " + status_req_topic);
         
         // Setup ZeroMQ health query subscription
         bus_->subscribe("agent.health.query", 
@@ -314,6 +335,53 @@ private:
         
         if (metrics_) {
             metrics_->increment("commands.received");
+        }
+    }
+    
+    void handle_status_request(const MqttMsg& msg) {
+        log(LogLevel::Info, "Status", "Received STATUS_REQUEST on topic: " + msg.topic);
+        
+        // Payload contains the response topic (plain string, not JSON)
+        std::string response_topic = msg.payload;
+        
+        // Trim whitespace from response topic
+        response_topic.erase(0, response_topic.find_first_not_of(" \t\n\r"));
+        response_topic.erase(response_topic.find_last_not_of(" \t\n\r") + 1);
+        
+        if (response_topic.empty()) {
+            log(LogLevel::Warn, "Status", "STATUS_REQUEST payload is empty, cannot send response");
+            return;
+        }
+        
+        log(LogLevel::Info, "Status", "Response topic: " + response_topic);
+        
+        // Route MQTT message to extensions via ZeroMQ bus
+        // Extensions can subscribe to "mqtt.status_request" to receive notifications
+        Envelope mqtt_envelope;
+        mqtt_envelope.topic = "mqtt.status_request";
+        mqtt_envelope.payload_json = "{\"response_topic\":\"" + response_topic + "\",\"mqtt_topic\":\"" + msg.topic + "\"}";
+        mqtt_envelope.ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        
+        bus_->publish(mqtt_envelope);
+        
+        log(LogLevel::Info, "Status", "Forwarded STATUS_REQUEST to extensions via ZeroMQ");
+        
+        // Publish "1" to indicate device is online
+        MqttMsg response;
+        response.topic = response_topic;
+        response.payload = "1";
+        response.qos = config_->mqtt.qos;
+        response.retain = config_->mqtt.retain;
+        
+        mqtt_client_->publish(response);
+        
+        log(LogLevel::Info, "Status", "Sent STATUS_RESPONSE to: " + response_topic);
+        
+        if (metrics_) {
+            metrics_->increment("status.requests.received");
+            metrics_->increment("status.responses.sent");
+            metrics_->increment("mqtt.messages.forwarded");
         }
     }
     

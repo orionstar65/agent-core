@@ -3,7 +3,9 @@
     "baseUrl": "https://35.159.104.91:443",
     "authPath": "/deviceservices/api/Authentication/devicecertificatevalid/",
     "isRegisteredPath": "/deviceservices/api/devicemanagement/isdeviceregistered/",
-    "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/"
+    "getActivationPath": "/deviceservices/api/devicemanagement/getactivationinformation/",
+    "commInfoPath": "/deviceservices/api/DeviceManagement/getcommunicationinformation/",
+    "usePersistentSession": false
   },
   "identity": {
     "isGateway": false,
@@ -15,9 +17,14 @@
     "enabled": false
   },
   "mqtt": {
-    "host": "mqtt.nucleus.example",
-    "port": 8883,
-    "keepalive": 30
+    "qos": 1,
+    "retain": false,
+    "connectionTimeoutSec": 30,
+    "keepaliveIntervalSec": 60,
+    "commandTimeoutSec": 3,
+    "topics": {
+      "statusRequest": "/STATUS_REQUEST"
+    }
   },
   "cert": {
     "storeHint": "OS",

@@ -11,6 +11,8 @@ struct Config {
         std::string auth_path{"/deviceservices/api/Authentication/devicecertificatevalid/"};
         std::string is_registered_path{"/deviceservices/api/devicemanagement/isdeviceregistered/"};
         std::string get_activation_path{"/deviceservices/api/devicemanagement/getactivationinformation/"};
+        std::string comm_info_path{"/deviceservices/api/DeviceManagement/getcommunicationinformation/"};
+        bool use_persistent_session{false};  // Bool parameter for comm_info API (false), true for others
     } backend;
 
     struct Identity {
@@ -25,9 +27,16 @@ struct Config {
     } tunnel;
 
     struct Mqtt {
-        std::string host{"mqtt.example.tbd"};
-        int port{8883};
-        int keepalive_s{30};
+        int qos{1};  // Quality of Service (0, 1, 2)
+        bool retain{false};  // Retain messages on broker
+        int connection_timeout_sec{30};
+        int keepalive_interval_sec{60};
+        int command_timeout_sec{3};  // Max 3 seconds for command routing
+        
+        // MQTT topics configuration (extensible for future topics)
+        struct Topics {
+            std::string status_request{"/STATUS_REQUEST"};  // Backend sends status requests here
+        } topics;
     } mqtt;
 
     struct Cert {

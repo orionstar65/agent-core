@@ -14,6 +14,23 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID}")
 
+# Option for static linking (preferred for IoT deployment)
+# NOTE: Paho MQTT C++ static library not available in Ubuntu packages
+#       See TODO_STATIC_LINKING.md for instructions to build from source
+option(BUILD_STATIC "Build with static linking where possible" ON)
+
+if(BUILD_STATIC)
+    message(STATUS "Configuring for static linking (where available)")
+    if(WIN32)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    else()
+        # Linux: Prefer static but allow dynamic for Paho MQTT C++
+        message(STATUS "Note: Paho MQTT C++ will use dynamic linking until static lib is built")
+    endif()
+else()
+    message(STATUS "Configuring for dynamic linking")
+endif()
+
 # Compiler flags
 if(MSVC)
     add_compile_options(/W4)
@@ -22,8 +39,38 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Find required packages
+# Find required packages - ALL STATIC ONLY
+
+# CURL - static
+set(CURL_STATICLIB ON)
 find_package(CURL REQUIRED)
+
+# Paho MQTT C - prefer /usr/local (newer with WebSocket support)
+find_library(PAHO_MQTT_C_LIB NAMES paho-mqtt3as libpaho-mqtt3as.a
+    PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu
+    NO_DEFAULT_PATH)
+
+# Paho MQTT C++ - check /usr/local first, then system
+find_library(PAHO_MQTT_CPP_LIB NAMES paho-mqttpp3 libpaho-mqttpp3.a
+    PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu)
+
+find_path(PAHO_MQTT_INCLUDE_DIR mqtt/async_client.h
+    PATHS /usr/local/include /usr/include)
+
+if(PAHO_MQTT_C_LIB AND PAHO_MQTT_CPP_LIB AND PAHO_MQTT_INCLUDE_DIR)
+    set(PAHO_MQTT_FOUND TRUE)
+    message(STATUS "Paho MQTT C: ${PAHO_MQTT_C_LIB}")
+    message(STATUS "Paho MQTT C++: ${PAHO_MQTT_CPP_LIB}")
+    message(STATUS "Paho MQTT headers: ${PAHO_MQTT_INCLUDE_DIR}")
+    
+    # Check if using dynamic library and warn
+    if(PAHO_MQTT_CPP_LIB MATCHES "\\.so")
+        message(WARNING "Using dynamic Paho MQTT C++ library - see TODO_STATIC_LINKING.md")
+    endif()
+else()
+    set(PAHO_MQTT_FOUND FALSE)
+    message(FATAL_ERROR "Paho MQTT libraries not found! Install: sudo apt-get install libpaho-mqtt-dev libpaho-mqttpp-dev")
+endif()
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -41,7 +88,9 @@ set(AGENT_CORE_SOURCES
     src/identity/identity.cpp
     src/net/net_path_selector.cpp
     src/net/https_client.cpp
+    src/net/comm_info_manager.cpp
     src/auth/auth_manager.cpp
+    src/auth/aws_sigv4.cpp
     src/reg/registration_ssm.cpp
     src/mqtt/mqtt_client.cpp
     src/bus/zmq_bus.cpp
@@ -77,11 +126,24 @@ add_executable(agent-core ${AGENT_CORE_SOURCES})
 # Link libraries
 target_link_libraries(agent-core PRIVATE CURL::libcurl)
 
-# Platform-specific libraries
+# Paho MQTT
+if(PAHO_MQTT_FOUND)
+    target_include_directories(agent-core PRIVATE ${PAHO_MQTT_INCLUDE_DIR})
+    target_link_libraries(agent-core PRIVATE ${PAHO_MQTT_CPP_LIB} ${PAHO_MQTT_C_LIB})
+    target_compile_definitions(agent-core PRIVATE HAVE_PAHO_MQTT)
+endif()
+
+# Platform-specific libraries - ALL STATIC
 if(WIN32)
-    target_link_libraries(agent-core PRIVATE ws2_32)
+    target_link_libraries(agent-core PRIVATE ws2_32 crypt32 wldap32 normaliz bcrypt)
 else()
-    target_link_libraries(agent-core PRIVATE pthread)
+    # Linux system libraries
+    target_link_libraries(agent-core PRIVATE pthread rt dl m)
+    
+    # OpenSSL (required by CURL and Paho MQTT)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(agent-core PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    message(STATUS "OpenSSL: ${OPENSSL_VERSION}")
 endif()
 
 # ZeroMQ
@@ -152,6 +214,9 @@ message(STATUS "")
 message(STATUS "Agent Core Configuration Summary:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Static linking: ${BUILD_STATIC}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  ZeroMQ found: ${ZMQ_FOUND}")
+message(STATUS "  Paho MQTT found: ${PAHO_MQTT_FOUND}")
 message(STATUS "")

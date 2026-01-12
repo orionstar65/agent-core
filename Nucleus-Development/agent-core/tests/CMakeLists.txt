@@ -10,7 +10,9 @@ set(AGENT_LIB_SOURCES
     ../src/identity/identity.cpp
     ../src/net/net_path_selector.cpp
     ../src/net/https_client.cpp
+    ../src/net/comm_info_manager.cpp
     ../src/auth/auth_manager.cpp
+    ../src/auth/aws_sigv4.cpp
     ../src/reg/registration_ssm.cpp
     ../src/mqtt/mqtt_client.cpp
     ../src/bus/zmq_bus.cpp
@@ -40,253 +42,183 @@ else()
     )
 endif()
 
+# Find Paho MQTT libraries (same as main CMakeLists.txt)
+find_library(PAHO_MQTT_C_LIB NAMES libpaho-mqtt3as.a paho-mqtt3as
+    PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu)
+find_library(PAHO_MQTT_CPP_LIB NAMES paho-mqttpp3 libpaho-mqttpp3.a
+    PATHS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu)
+find_path(PAHO_MQTT_INCLUDE_DIR mqtt/async_client.h
+    PATHS /usr/include /usr/local/include)
+
+if(PAHO_MQTT_C_LIB AND PAHO_MQTT_CPP_LIB AND PAHO_MQTT_INCLUDE_DIR)
+    set(PAHO_MQTT_FOUND TRUE)
+    message(STATUS "Tests: Paho MQTT found")
+else()
+    set(PAHO_MQTT_FOUND FALSE)
+    message(WARNING "Tests: Paho MQTT not found - MQTT tests will use stub")
+endif()
+
+# Helper function to setup test executable with all dependencies
+function(setup_test_executable TARGET_NAME)
+    target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(${TARGET_NAME} PRIVATE CURL::libcurl)
+    
+    # Paho MQTT
+    if(PAHO_MQTT_FOUND)
+        target_include_directories(${TARGET_NAME} PRIVATE ${PAHO_MQTT_INCLUDE_DIR})
+        target_link_libraries(${TARGET_NAME} PRIVATE ${PAHO_MQTT_CPP_LIB} ${PAHO_MQTT_C_LIB})
+        target_compile_definitions(${TARGET_NAME} PRIVATE HAVE_PAHO_MQTT)
+    endif()
+    
+    # OpenSSL (required by Paho MQTT)
+    find_package(OpenSSL QUIET)
+    if(OPENSSL_FOUND)
+        target_link_libraries(${TARGET_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    endif()
+    
+    # ZeroMQ
+    if(ZMQ_FOUND)
+        target_include_directories(${TARGET_NAME} PRIVATE ${ZMQ_INCLUDE_DIRS})
+        target_link_libraries(${TARGET_NAME} PRIVATE ${ZMQ_LIBRARIES})
+        target_compile_definitions(${TARGET_NAME} PRIVATE HAVE_ZMQ)
+        if(CPPZMQ_INCLUDE_DIR)
+            target_include_directories(${TARGET_NAME} PRIVATE ${CPPZMQ_INCLUDE_DIR})
+        endif()
+    endif()
+    
+    # Platform-specific
+    if(WIN32)
+        target_link_libraries(${TARGET_NAME} PRIVATE ws2_32)
+    else()
+        target_link_libraries(${TARGET_NAME} PRIVATE pthread)
+    endif()
+endfunction()
+
 # Integration test for authentication
 add_executable(test_auth
     integration/test_auth.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_auth PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_auth PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_auth PRIVATE ws2_32)
-else()
-    target_link_libraries(test_auth PRIVATE pthread)
-endif()
+setup_test_executable(test_auth)
 
 # Integration test for ZeroMQ
 add_executable(test_zmq
     integration/test_zmq.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_zmq PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_zmq PRIVATE CURL::libcurl)
-
-# ZeroMQ
-if(ZMQ_FOUND)
-    target_include_directories(test_zmq PRIVATE ${ZMQ_INCLUDE_DIRS})
-    target_link_libraries(test_zmq PRIVATE ${ZMQ_LIBRARIES})
-    target_compile_definitions(test_zmq PRIVATE HAVE_ZMQ)
-    # cppzmq headers (header-only library)
-    find_path(CPPZMQ_INCLUDE_DIR zmq.hpp PATHS ${ZMQ_INCLUDE_DIRS} ${CMAKE_PREFIX_PATH}/include)
-    if(CPPZMQ_INCLUDE_DIR)
-        target_include_directories(test_zmq PRIVATE ${CPPZMQ_INCLUDE_DIR})
-    endif()
-endif()
-
-if(WIN32)
-    target_link_libraries(test_zmq PRIVATE ws2_32)
-else()
-    target_link_libraries(test_zmq PRIVATE pthread)
-endif()
+setup_test_executable(test_zmq)
 
 # ZeroMQ load test
 add_executable(test_zmq_load
     integration/test_zmq_load.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_zmq_load PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_zmq_load PRIVATE CURL::libcurl)
-
-# ZeroMQ
-if(ZMQ_FOUND)
-    target_include_directories(test_zmq_load PRIVATE ${ZMQ_INCLUDE_DIRS})
-    target_link_libraries(test_zmq_load PRIVATE ${ZMQ_LIBRARIES})
-    target_compile_definitions(test_zmq_load PRIVATE HAVE_ZMQ)
-    # cppzmq headers (header-only library)
-    if(CPPZMQ_INCLUDE_DIR)
-        target_include_directories(test_zmq_load PRIVATE ${CPPZMQ_INCLUDE_DIR})
-    endif()
-endif()
-
-if(WIN32)
-    target_link_libraries(test_zmq_load PRIVATE ws2_32)
-else()
-    target_link_libraries(test_zmq_load PRIVATE pthread)
-endif()
+setup_test_executable(test_zmq_load)
 
 # Integration test for SSM Registration
 add_executable(test_ssm_registration
     integration/test_ssm_registration.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_ssm_registration PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_ssm_registration PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_ssm_registration PRIVATE ws2_32)
-else()
-    target_link_libraries(test_ssm_registration PRIVATE pthread)
-endif()
+setup_test_executable(test_ssm_registration)
 
 # Identity discovery test
 add_executable(test_identity
     integration/test_identity.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_identity PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_identity PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_identity PRIVATE ws2_32)
-else()
-    target_link_libraries(test_identity PRIVATE pthread)
-endif()
+setup_test_executable(test_identity)
 
 # Unit test for RestartManager
 add_executable(test_restart_manager
     unit/test_restart_manager.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_restart_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_restart_manager PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_restart_manager PRIVATE ws2_32)
-else()
-    target_link_libraries(test_restart_manager PRIVATE pthread)
-endif()
+setup_test_executable(test_restart_manager)
 
 # Unit test for Structured Logging
 add_executable(test_logging
     unit/test_logging.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_logging PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_logging PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_logging PRIVATE ws2_32)
-else()
-    target_link_libraries(test_logging PRIVATE pthread)
-endif()
+setup_test_executable(test_logging)
 
 # Unit test for Log Throttler
 add_executable(test_log_throttler
     unit/test_log_throttler.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_log_throttler PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_log_throttler PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_log_throttler PRIVATE ws2_32)
-else()
-    target_link_libraries(test_log_throttler PRIVATE pthread)
-endif()
+setup_test_executable(test_log_throttler)
 
 # Unit test for Retry Metrics
 add_executable(test_retry_metrics
     unit/test_retry_metrics.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_retry_metrics PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_retry_metrics PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_retry_metrics PRIVATE ws2_32)
-else()
-    target_link_libraries(test_retry_metrics PRIVATE pthread)
-endif()
+setup_test_executable(test_retry_metrics)
 
 # Integration test for Restart/Quarantine
 add_executable(test_restart_quarantine
     integration/test_restart_quarantine.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_restart_quarantine PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_restart_quarantine PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_restart_quarantine PRIVATE ws2_32)
-else()
-    target_link_libraries(test_restart_quarantine PRIVATE pthread)
-endif()
+setup_test_executable(test_restart_quarantine)
 
 # Integration test for Service Installer
 add_executable(test_service_installer
 integration/test_service_installer.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_service_installer PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_service_installer PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_service_installer PRIVATE ws2_32)
-else()
-    target_link_libraries(test_service_installer PRIVATE pthread)
-endif()
+setup_test_executable(test_service_installer)
 
 # Integration test for Logging & Throttling
 add_executable(test_logging_throttling
     integration/test_logging_throttling.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_logging_throttling PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_logging_throttling PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_logging_throttling PRIVATE ws2_32)
-else()
-    target_link_libraries(test_logging_throttling PRIVATE pthread)
-endif()
+setup_test_executable(test_logging_throttling)
 
 # Unit test for ExtensionManager
 add_executable(test_extension_manager
     unit/test_extension_manager.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_extension_manager PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_extension_manager PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_extension_manager PRIVATE ws2_32)
-else()
-    target_link_libraries(test_extension_manager PRIVATE pthread)
-endif()
+setup_test_executable(test_extension_manager)
 
 # Integration test for Extension Lifecycle
 add_executable(test_extension_lifecycle
     integration/test_extension_lifecycle.cpp
     ${AGENT_LIB_SOURCES}
 )
-
-target_include_directories(test_extension_lifecycle PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_extension_lifecycle PRIVATE CURL::libcurl)
-
-if(WIN32)
-    target_link_libraries(test_extension_lifecycle PRIVATE ws2_32)
-else()
-    target_link_libraries(test_extension_lifecycle PRIVATE pthread)
-endif()
+setup_test_executable(test_extension_lifecycle)
 
 # Unit test for Health Response Format
 add_executable(test_health_format
     unit/test_health_format.cpp
     ${AGENT_LIB_SOURCES}
 )
+setup_test_executable(test_health_format)
 
-target_include_directories(test_health_format PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(test_health_format PRIVATE CURL::libcurl)
+# Unit test for Communication Info
+add_executable(test_comm_info
+    unit/test_comm_info.cpp
+    ${AGENT_LIB_SOURCES}
+)
+setup_test_executable(test_comm_info)
 
-if(WIN32)
-    target_link_libraries(test_health_format PRIVATE ws2_32)
-else()
-    target_link_libraries(test_health_format PRIVATE pthread)
-endif()
+# Integration test for MQTT Connection
+add_executable(test_mqtt_connection
+    integration/test_mqtt_connection.cpp
+    ${AGENT_LIB_SOURCES}
+)
+setup_test_executable(test_mqtt_connection)
+
+# Integration test for MQTT to ZeroMQ
+add_executable(test_mqtt_zeromq
+    integration/test_mqtt_zeromq.cpp
+    ${AGENT_LIB_SOURCES}
+)
+setup_test_executable(test_mqtt_zeromq)
 
 # Register tests with CTest and set working directory
 add_test(NAME RestartManagerUnitTest COMMAND test_restart_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -303,8 +235,12 @@ add_test(NAME ServiceInstallerTest COMMAND test_service_installer WORKING_DIRECT
 add_test(NAME ExtensionManagerUnitTest COMMAND test_extension_manager WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME ExtensionLifecycleIntegrationTest COMMAND test_extension_lifecycle WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 add_test(NAME HealthFormatUnitTest COMMAND test_health_format WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME CommInfoUnitTest COMMAND test_comm_info WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME MqttConnectionIntegrationTest COMMAND test_mqtt_connection --skip-network WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME MqttZeroMQIntegrationTest COMMAND test_mqtt_zeromq WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 # Note: SSM registration and service installer tests require sudo for full testing
 # Run manually with: sudo ./build/tests/test_ssm_registration --full
 # Run manually with: sudo ./build/tests/test_service_installer --full
+# Run manually with: ./build/tests/test_mqtt_connection --test-status-request
 
 message(STATUS "Unit and integration tests configured")

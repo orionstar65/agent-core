@@ -36,6 +36,12 @@ std::unique_ptr<Config> load_config(const std::string& path) {
             if (backend.contains("getActivationPath")) {
                 config->backend.get_activation_path = backend["getActivationPath"].get<std::string>();
             }
+            if (backend.contains("commInfoPath")) {
+                config->backend.comm_info_path = backend["commInfoPath"].get<std::string>();
+            }
+            if (backend.contains("usePersistentSession")) {
+                config->backend.use_persistent_session = backend["usePersistentSession"].get<bool>();
+            }
         }
         
         // Parse identity
@@ -63,14 +69,27 @@ std::unique_ptr<Config> load_config(const std::string& path) {
         // Parse MQTT
         if (j.contains("mqtt")) {
             auto& mqtt = j["mqtt"];
-            if (mqtt.contains("host")) {
-                config->mqtt.host = mqtt["host"].get<std::string>();
+            if (mqtt.contains("qos")) {
+                config->mqtt.qos = mqtt["qos"].get<int>();
             }
-            if (mqtt.contains("port")) {
-                config->mqtt.port = mqtt["port"].get<int>();
+            if (mqtt.contains("retain")) {
+                config->mqtt.retain = mqtt["retain"].get<bool>();
             }
-            if (mqtt.contains("keepalive")) {
-                config->mqtt.keepalive_s = mqtt["keepalive"].get<int>();
+            if (mqtt.contains("connectionTimeoutSec")) {
+                config->mqtt.connection_timeout_sec = mqtt["connectionTimeoutSec"].get<int>();
+            }
+            if (mqtt.contains("keepaliveIntervalSec")) {
+                config->mqtt.keepalive_interval_sec = mqtt["keepaliveIntervalSec"].get<int>();
+            }
+            if (mqtt.contains("commandTimeoutSec")) {
+                config->mqtt.command_timeout_sec = mqtt["commandTimeoutSec"].get<int>();
+            }
+            // Parse MQTT topics (extensible for future topics)
+            if (mqtt.contains("topics")) {
+                auto& topics = mqtt["topics"];
+                if (topics.contains("statusRequest")) {
+                    config->mqtt.topics.status_request = topics["statusRequest"].get<std::string>();
+                }
             }
         }
         

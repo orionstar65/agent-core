@@ -43,10 +43,29 @@ A cross-platform C++ IoT service that manages identity, connectivity, authentica
 - libcurl (for HTTPS communication)
 - nlohmann/json (for JSON parsing)
 - ZeroMQ (libzmq + cppzmq for extension IPC)
+- OpenSSL (for SigV4 signing and TLS)
+- Paho MQTT C and C++ libraries (for AWS IoT MQTT over WebSocket)
 
 **Install on Ubuntu/Debian:**
 ```bash
-sudo apt-get install -y build-essential cmake libcurl4-openssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev
+# Core dependencies
+sudo apt-get install -y build-essential cmake libcurl4-openssl-dev nlohmann-json3-dev libzmq3-dev libcppzmq-dev libssl-dev
+
+# Paho MQTT C library (build from source for WebSocket support)
+git clone https://github.com/eclipse/paho.mqtt.c.git
+cd paho.mqtt.c
+cmake -S . -B build -DPAHO_WITH_SSL=ON -DPAHO_BUILD_SHARED=ON
+cmake --build build
+sudo cmake --install build
+cd ..
+
+# Paho MQTT C++ library
+git clone https://github.com/eclipse/paho.mqtt.cpp.git
+cd paho.mqtt.cpp
+cmake -S . -B build -DPAHO_WITH_SSL=ON
+cmake --build build
+sudo cmake --install build
+sudo ldconfig
 ```
 
 ### Quick Start
@@ -387,8 +406,8 @@ Query extension health status via ZeroMQ:
 - **Topic Filtering**: Support for exact match, prefix patterns (`ext.ps.`), and wildcards (`ext.ps.*`)
 - **Correlation IDs**: Request/response correlation with automatic ID preservation
 - **CURVE Encryption**: Optional end-to-end encryption for inter-process communication (configurable)
-- **Cross-Platform Transport**: 
-  - **Linux**: Uses IPC sockets (`ipc:///tmp/agent-bus-*`) for efficient in-process communication
+- **Platform-Specific Transport**: 
+  - **Linux**: Uses IPC sockets (`ipc:///run/agent-core/bus-pub`, `ipc:///run/agent-core/bus-req`) for efficient local communication. The `/run/agent-core/` directory is created automatically by systemd's `RuntimeDirectory=` directive or by agent-core on first run.
   - **Windows**: Uses TCP localhost (`tcp://127.0.0.1:port`) due to ZeroMQ IPC limitations on Windows
   - **CURVE Encryption**: Only applied to TCP connections (Windows or when explicitly enabled)
 
@@ -472,8 +491,8 @@ For detailed schema documentation, see `docs/envelope_schema.md`.
 Extensions are independent executables that communicate with Agent Core via ZeroMQ:
 
 **Requirements:**
-1. Connect to ZeroMQ bus (IPC endpoint: `ipc:///tmp/agent-bus-pub` on Linux, TCP on Windows)
-2. Subscribe to relevant topics
+1. Connect to ZeroMQ bus (IPC endpoint: `ipc:///run/agent-core/bus-pub` on Linux, TCP on Windows)
+2. Subscribe to relevant topics (e.g., `mqtt.status_request` for MQTT forwarded messages)
 3. Publish events/responses with correlation IDs
 4. Handle SIGTERM for graceful shutdown
 5. Maintain process health (avoid crashes/hangs)
@@ -622,6 +641,9 @@ ctest --test-dir build --output-on-failure
 - `test_zmq` - ZeroMQ bus integration tests (requires sample extension to be built)
 - `test_zmq_load` - ZeroMQ load tests (10k msgs/min, PUB/SUB, REQ/REP, soak test)
 - `test_ssm_registration` - SSM registration integration tests (some tests require sudo)
+- `test_comm_info` - Communication info API tests (AWS IoT credentials fetch)
+- `test_mqtt_connection` - MQTT connection tests (WebSocket + SigV4 authentication)
+- `test_mqtt_zeromq` - MQTT to ZeroMQ forwarding tests (use `--e2e` for full end-to-end test)
 
 ### ZeroMQ Integration Test
 
@@ -685,9 +707,63 @@ The ZeroMQ bus can be configured in the `zmq` section of the config file:
 ```
 
 **Platform-Specific Transport:**
-- **Linux**: Uses IPC sockets (`ipc:///tmp/agent-bus-pub`, `ipc:///tmp/agent-bus-req`) for efficient local communication. IPC sockets are automatically cleaned up when the process exits. Port numbers are ignored on Linux (IPC paths are used instead).
+- **Linux**: Uses IPC sockets (`ipc:///run/agent-core/bus-pub`, `ipc:///run/agent-core/bus-req`) for efficient local communication. The directory is created by systemd's `RuntimeDirectory=agent-core` directive (for services) or by agent-core itself (for standalone execution). IPC sockets are automatically cleaned up when the process exits.
 - **Windows**: Uses TCP localhost (`tcp://127.0.0.1:pubPort`, `tcp://127.0.0.1:reqPort`) because ZeroMQ IPC doesn't work reliably on Windows. Port numbers from config are used.
 - **CURVE Encryption**: Only applied to TCP connections (Windows or when explicitly enabled). IPC connections on Linux do not use CURVE encryption as they are already local-only and more efficient.
+
+### MQTT Connection & STATUS_REQUEST Flow
+
+Agent Core connects to AWS IoT Core via WebSocket with SigV4 authentication and handles STATUS_REQUEST/RESPONSE for device online status:
+
+**Connection Flow:**
+1. Fetch temporary AWS credentials from backend (`getcommunicationinformation` API)
+2. Generate SigV4-signed WebSocket URL for AWS IoT endpoint
+3. Connect via Paho MQTT C++ client over WebSocket (WSS)
+4. Subscribe to command and STATUS_REQUEST topics
+5. Auto-reconnect on connection loss (handled by Paho)
+
+**STATUS_REQUEST/RESPONSE Handshake:**
+1. Backend publishes to `/STATUS_REQUEST/{serialNumber}_{uuid}`
+2. Agent-core receives message with response topic in payload
+3. Agent-core forwards message to extensions via ZeroMQ (`mqtt.status_request` topic)
+4. Agent-core publishes `"1"` to the response topic to indicate device is online
+
+**ZeroMQ Message Format (forwarded to extensions):**
+```json
+{
+  "v": 2,
+  "topic": "mqtt.status_request",
+  "payload": {
+    "response_topic": "/STATUS_RESPONSE/200000_uuid",
+    "mqtt_topic": "/STATUS_REQUEST/200000_uuid"
+  },
+  "ts": 1731283200000
+}
+```
+
+**Configuration:**
+```json
+{
+  "backend": {
+    "commInfoPath": "/deviceservices/api/DeviceManagement/getcommunicationinformation/",
+    "usePersistentSession": false
+  },
+  "mqtt": {
+    "qos": 1,
+    "connectionTimeoutSec": 30,
+    "keepaliveIntervalSec": 60,
+    "topics": {
+      "statusRequest": "/STATUS_REQUEST"
+    }
+  }
+}
+```
+
+**MQTT Topics:**
+- Subscribe: `/STATUS_REQUEST/{serialNumber}_{uuid}` - Receives status check requests
+- Subscribe: `device/{serialNumber}/commands` - Receives device commands
+- Publish: `/STATUS_RESPONSE/{serialNumber}_{uuid}` - Responds with "1" for online status
+- Publish: `device/{serialNumber}/heartbeat` - Periodic heartbeat messages
 
 ### SSM Registration Integration Test
 
@@ -718,6 +794,48 @@ The test will verify:
 - Valid certificate file at `cert_base64(200000).txt`
 - AWS SSM Agent installed (for full registration test)
 - Backend API accessible at configured URL
+
+### MQTT and ZeroMQ End-to-End Test
+
+The MQTT/ZeroMQ end-to-end test verifies the complete STATUS_REQUEST flow:
+
+```bash
+# Run unit tests (no network/service required)
+./build/tests/test_mqtt_zeromq
+
+# Run full end-to-end test (requires sudo for service installation)
+sudo LD_LIBRARY_PATH=/usr/local/lib ./build/tests/test_mqtt_zeromq --e2e
+```
+
+The end-to-end test (`--e2e`) verifies:
+1. Agent-core service installation and startup
+2. MQTT connection to AWS IoT via WebSocket + SigV4
+3. STATUS_REQUEST subscription and handling
+4. ZeroMQ forwarding to sample extension
+5. Sample extension receives and prints payload
+6. STATUS_RESPONSE "1" sent back via MQTT
+7. Clean service uninstallation after test
+
+**Test Flow:**
+```
+Test Client                Agent-Core Service           Sample Extension
+    |                            |                            |
+    |-- STATUS_REQUEST --------->|                            |
+    |   (via MQTT)               |                            |
+    |                            |-- mqtt.status_request ---->|
+    |                            |   (via ZeroMQ PUB/SUB)     |
+    |                            |                            |
+    |                            |          [prints payload]  |
+    |                            |                            |
+    |<-- STATUS_RESPONSE "1" ----|                            |
+    |   (via MQTT)               |                            |
+```
+
+**Prerequisites:**
+- Paho MQTT C/C++ libraries installed (`/usr/local/lib`)
+- Sample extension built at `extensions/sample/build/sample-ext`
+- Network connectivity to AWS IoT endpoint
+- Valid device credentials (certificate, serial number, UUID)
 
 ### Chaos Testing
 ```bash

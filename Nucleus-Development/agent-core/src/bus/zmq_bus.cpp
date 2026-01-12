@@ -14,12 +14,40 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <cerrno>
 
 #ifdef HAVE_ZMQ
 #include <zmq.hpp>
 #endif
 
 namespace agent {
+
+// Helper to ensure IPC socket directory exists
+static bool ensure_socket_dir_exists(const std::string& dir_path) {
+#ifndef _WIN32
+    struct stat st;
+    if (stat(dir_path.c_str(), &st) == 0) {
+        // Directory exists
+        return true;
+    }
+    
+    // Try to create the directory
+    if (mkdir(dir_path.c_str(), 0755) == 0) {
+        return true;
+    }
+    
+    // mkdir failed - check if it's because directory was created by another process
+    if (errno == EEXIST) {
+        return true;
+    }
+    
+    return false;
+#else
+    return true;  // Windows uses TCP, not IPC
+#endif
+}
 
 class ZmqBusImpl : public Bus {
 public:
@@ -41,9 +69,17 @@ public:
         std::string pub_endpoint = "tcp://127.0.0.1:" + std::to_string(pub_port_);
         pub_is_tcp = true;
 #else
-        // Linux: Use /tmp/ directory for IPC
-        // Note: IPC sockets are cleaned up automatically when the process exits
-        std::string pub_endpoint = "ipc:///tmp/agent-bus-pub";
+        // Linux: Use /run/agent-core/ for IPC sockets (standard runtime directory)
+        // For systemd services, RuntimeDirectory= creates this automatically
+        // For standalone/test execution, we create it here
+        const std::string socket_dir = "/run/agent-core";
+        if (!ensure_socket_dir_exists(socket_dir)) {
+            if (logger_) {
+                logger_->log(LogLevel::Warn, "Bus", "Could not create socket directory, IPC may fail", 
+                    {{"dir", socket_dir}, {"errno", std::to_string(errno)}});
+            }
+        }
+        std::string pub_endpoint = "ipc://" + socket_dir + "/bus-pub";
         pub_is_tcp = false;
 #endif
         
@@ -76,9 +112,8 @@ public:
         std::string req_endpoint = "tcp://127.0.0.1:" + std::to_string(req_port_);
         req_is_tcp = true;
 #else
-        // Linux: Use /tmp/ directory for IPC
-        // Note: IPC sockets are cleaned up automatically when the process exits
-        std::string req_endpoint = "ipc:///tmp/agent-bus-req";
+        // Linux: Use same directory as pub socket
+        std::string req_endpoint = "ipc://" + socket_dir + "/bus-req";
         req_is_tcp = false;
 #endif
         
@@ -257,9 +292,8 @@ public:
             std::string sub_endpoint = "tcp://127.0.0.1:" + std::to_string(pub_port_);
                     sub_is_tcp = true;
 #else
-            // Linux: Use /tmp/ directory for IPC
-                    // Note: IPC sockets are cleaned up automatically when the process exits
-            std::string sub_endpoint = "ipc:///tmp/agent-bus-pub";
+            // Linux: Use /run/agent-core/ for IPC sockets
+            std::string sub_endpoint = "ipc:///run/agent-core/bus-pub";
                     sub_is_tcp = false;
 #endif
                     
