@@ -75,7 +75,7 @@ void test_telemetry_collection() {
     assert(j["Readings"].is_array() && "Readings should be an array");
     assert(j["Readings"].size() > 0 && "Readings array should not be empty");
     
-    std::cout << "✓ Test passed: Telemetry collection successful\n";
+    std::cout << "[OK] Test passed: Telemetry collection successful\n";
     std::cout << "  Collected " << batch.readings.size() << " readings\n";
     std::cout << "  JSON size: " << json_str.size() << " bytes\n";
 }
@@ -120,7 +120,7 @@ void test_telemetry_json_format() {
         assert(value >= 0.0 && "Value should be non-negative");
     }
     
-    std::cout << "✓ Test passed: JSON format validation successful\n";
+    std::cout << "[OK] Test passed: JSON format validation successful\n";
 }
 
 void test_telemetry_alerts() {
@@ -150,7 +150,7 @@ void test_telemetry_alerts() {
     // Check alerts (should not crash even if thresholds are exceeded)
     collector.check_alerts(batch);
     
-    std::cout << "✓ Test passed: Alert checking completed\n";
+    std::cout << "[OK] Test passed: Alert checking completed\n";
 }
 
 void test_telemetry_cache_storage() {
@@ -222,7 +222,7 @@ void test_telemetry_cache_storage() {
         // Ignore cleanup errors
     }
     
-    std::cout << "✓ Test passed: Cache storage successful\n";
+    std::cout << "[OK] Test passed: Cache storage successful\n";
 }
 
 void test_mqtt_topic_construction() {
@@ -251,7 +251,7 @@ void test_mqtt_topic_construction() {
     
     // The topic is built internally, but we can verify the cache was created
     // In a real test, we'd need to expose the topic building method or test via publish
-    std::cout << "✓ Test passed: MQTT topic construction (verified via cache creation)\n";
+    std::cout << "[OK] Test passed: MQTT topic construction (verified via cache creation)\n";
 }
 
 int main() {

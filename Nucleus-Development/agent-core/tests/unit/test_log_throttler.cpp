@@ -37,7 +37,7 @@ void test_throttling_activation() {
     int64_t throttled_count = throttler.get_throttled_count("TestSubsystem");
     assert(throttled_count == 10 && "Should have throttled 10 errors (after threshold)");
     
-    std::cout << "✓ Throttling activates after threshold\n";
+    std::cout << "[OK] Throttling activates after threshold\n";
 }
 
 void test_per_subsystem_throttling() {
@@ -72,7 +72,7 @@ void test_per_subsystem_throttling() {
     assert(throttler.should_throttle(LogLevel::Error, "Subsystem2") && 
            "4th error for Subsystem2 should be throttled");
     
-    std::cout << "✓ Per-subsystem throttling works independently\n";
+    std::cout << "[OK] Per-subsystem throttling works independently\n";
 }
 
 void test_throttling_reset_on_success() {
@@ -99,7 +99,7 @@ void test_throttling_reset_on_success() {
     bool should_throttle = throttler.should_throttle(LogLevel::Error, "TestSubsystem");
     assert(!should_throttle && "Should not be throttled after success");
     
-    std::cout << "✓ Throttling resets on success\n";
+    std::cout << "[OK] Throttling resets on success\n";
 }
 
 void test_only_error_levels_throttled() {
@@ -127,7 +127,7 @@ void test_only_error_levels_throttled() {
     assert(throttler.should_throttle(LogLevel::Critical, "TestSubsystem") && 
            "Critical should be throttled");
     
-    std::cout << "✓ Only ERROR and CRITICAL levels are throttled\n";
+    std::cout << "[OK] Only ERROR and CRITICAL levels are throttled\n";
 }
 
 void test_throttling_disabled() {
@@ -146,7 +146,7 @@ void test_throttling_disabled() {
         assert(!should_throttle && "Should not throttle when disabled");
     }
     
-    std::cout << "✓ Throttling respects enabled flag\n";
+    std::cout << "[OK] Throttling respects enabled flag\n";
 }
 
 void test_throttled_count_tracking() {
@@ -178,7 +178,7 @@ void test_throttled_count_tracking() {
     int64_t throttled = throttler.get_throttled_count("TestSubsystem");
     assert(throttled == 5 && "Should have throttled 5 errors after threshold");
     
-    std::cout << "✓ Throttled count tracked correctly\n";
+    std::cout << "[OK] Throttled count tracked correctly\n";
 }
 
 void test_activation_flag() {
@@ -207,7 +207,7 @@ void test_activation_flag() {
     assert(!throttler.was_just_activated("TestSubsystem") && 
            "Flag should be cleared");
     
-    std::cout << "✓ Activation flag works correctly\n";
+    std::cout << "[OK] Activation flag works correctly\n";
 }
 
 int main() {

@@ -58,7 +58,7 @@ void test_check_status() {
     }
     
     // Just verify we can query status without crashing
-    std::cout << "✓ Status check completed\n";
+    std::cout << "[OK] Status check completed\n";
 }
 
 void test_install_requires_root() {
@@ -75,7 +75,7 @@ void test_install_requires_root() {
     bool result = installer->install("/tmp/fake-binary", "/tmp/fake-config.json");
     assert(!result && "Install should fail without root privileges");
     
-    std::cout << "✓ Install correctly requires root\n";
+    std::cout << "[OK] Install correctly requires root\n";
 }
 
 void test_install_and_uninstall() {
@@ -162,7 +162,7 @@ void test_install_and_uninstall() {
         std::cout << "  Service start failed (may be expected if not fully configured)\n";
     }
     
-    std::cout << "✓ Install and uninstall test completed\n";
+    std::cout << "[OK] Install and uninstall test completed\n";
 }
 
 void test_directory_creation() {
@@ -209,7 +209,7 @@ void test_directory_creation() {
     assert(var_lib_exists && "State directory should be created");
     assert(etc_exists && "Config directory should be created");
     
-    std::cout << "✓ Directory creation test passed\n";
+    std::cout << "[OK] Directory creation test passed\n";
 }
 
 void test_double_install() {
@@ -252,7 +252,7 @@ void test_double_install() {
     bool second_install = installer->install(binary_path, config_path);
     assert(second_install && "Second install should succeed (idempotent)");
     
-    std::cout << "✓ Double install test passed (idempotent)\n";
+    std::cout << "[OK] Double install test passed (idempotent)\n";
 }
 
 int main(int argc, char* argv[]) {

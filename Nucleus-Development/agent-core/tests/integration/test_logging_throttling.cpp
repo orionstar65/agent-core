@@ -96,7 +96,7 @@ void test_throttled_logger_integration() {
     assert(error_count == 5 && "Should have logged 5 errors before throttling");
     assert(activation_count == 1 && "Should have activation message");
     
-    std::cout << "✓ Throttled logger suppresses repetitive errors\n";
+    std::cout << "[OK] Throttled logger suppresses repetitive errors\n";
 }
 
 void test_correlation_id_propagation() {
@@ -131,7 +131,7 @@ void test_correlation_id_propagation() {
         }
     }
     
-    std::cout << "✓ Correlation ID propagates through operation chain\n";
+    std::cout << "[OK] Correlation ID propagates through operation chain\n";
 }
 
 void test_throttling_summary_emission() {
@@ -184,7 +184,7 @@ void test_throttling_summary_emission() {
     
     assert(found_summary && "Should emit throttling summary");
     
-    std::cout << "✓ Throttling summary emitted on recovery\n";
+    std::cout << "[OK] Throttling summary emitted on recovery\n";
 }
 
 void test_offline_scenario_simulation() {
@@ -236,7 +236,7 @@ void test_offline_scenario_simulation() {
     assert(error_logs <= error_threshold + 1 && 
            "Should not log all errors when throttled");
     
-    std::cout << "✓ Offline scenario throttles repetitive errors\n";
+    std::cout << "[OK] Offline scenario throttles repetitive errors\n";
 }
 
 int main() {

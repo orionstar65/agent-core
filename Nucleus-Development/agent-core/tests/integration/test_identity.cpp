@@ -73,7 +73,7 @@ void test_config_override_priority() {
     assert(identity.is_gateway == false && "is_gateway should come from config");
     assert(identity.tunnel_info.enabled == true && "Tunnel info should come from config");
     
-    std::cout << "✓ Test passed: Config override has highest priority\n";
+    std::cout << "[OK] Test passed: Config override has highest priority\n";
 }
 
 // Test 2: Gateway config override
@@ -87,7 +87,7 @@ void test_gateway_config_override() {
     assert(identity.gateway_id == "CONFIG-GATEWAY-456" && "Gateway ID should come from config");
     assert(identity.uuid == "config-uuid-67890" && "UUID should come from config");
     
-    std::cout << "✓ Test passed: Gateway config override works\n";
+    std::cout << "[OK] Test passed: Gateway config override works\n";
 }
 
 // Test 3: JSON fallback when no config override
@@ -126,7 +126,7 @@ void test_json_fallback() {
         // Clean up
         remove_temp_identity_json(test_dir);
         
-        std::cout << "✓ Test passed: JSON fallback works\n";
+        std::cout << "[OK] Test passed: JSON fallback works\n";
     } catch (...) {
         remove_temp_identity_json(test_dir);
         throw;
@@ -171,7 +171,7 @@ void test_gateway_minimal_uuid() {
         // Clean up
         remove_temp_identity_json(test_dir);
         
-        std::cout << "✓ Test passed: Gateway mode generates UUID when needed\n";
+        std::cout << "[OK] Test passed: Gateway mode generates UUID when needed\n";
     } catch (...) {
         remove_temp_identity_json(test_dir);
         throw;
@@ -210,7 +210,7 @@ void test_json_all_fields() {
         // Clean up
         remove_temp_identity_json(test_dir);
         
-        std::cout << "✓ Test passed: JSON with all fields works\n";
+        std::cout << "[OK] Test passed: JSON with all fields works\n";
     } catch (...) {
         remove_temp_identity_json(test_dir);
         throw;
@@ -228,7 +228,7 @@ void test_backward_compatibility() {
     assert(identity.device_serial == identity.serial_number && 
            "device_serial should be mapped from serial_number for backward compatibility");
     
-    std::cout << "✓ Test passed: Backward compatibility maintained\n";
+    std::cout << "[OK] Test passed: Backward compatibility maintained\n";
 }
 
 // Test 7: UUID always generated
@@ -241,7 +241,7 @@ void test_uuid_always_generated() {
     // UUID should always be set, even if not in config
     assert(!identity.uuid.empty() && "UUID should always be generated if not provided");
     
-    std::cout << "✓ Test passed: UUID always generated\n";
+    std::cout << "[OK] Test passed: UUID always generated\n";
 }
 
 // Test 8: Gateway with standard fields
@@ -280,7 +280,7 @@ void test_gateway_with_standard_fields() {
         // Clean up
         remove_temp_identity_json(test_dir);
         
-        std::cout << "✓ Test passed: Gateway with standard fields works\n";
+        std::cout << "[OK] Test passed: Gateway with standard fields works\n";
     } catch (...) {
         remove_temp_identity_json(test_dir);
         throw;
@@ -299,7 +299,7 @@ void test_system_discovery_fallback() {
     assert(!identity.serial_number.empty() && "System discovery should provide serial_number");
     assert(!identity.uuid.empty() && "UUID should always be generated");
     
-    std::cout << "✓ Test passed: System discovery fallback works\n";
+    std::cout << "[OK] Test passed: System discovery fallback works\n";
 }
 
 // Test 10: Tunnel info from JSON
@@ -330,7 +330,7 @@ void test_tunnel_info_from_json() {
         // Clean up
         remove_temp_identity_json(test_dir);
         
-        std::cout << "✓ Test passed: Tunnel info can be read from JSON\n";
+        std::cout << "[OK] Test passed: Tunnel info can be read from JSON\n";
     } catch (...) {
         remove_temp_identity_json(test_dir);
         throw;
@@ -346,7 +346,7 @@ void test_windows_registry_note() {
     std::cout << "  Path: HKLM\\SOFTWARE\\AgentCore\\Identity\n";
     std::cout << "  Values: serialNumber, materialNumber, productName, softwareVersion\n";
     std::cout << "  Then run discover_identity() with empty config to verify registry is read.\n";
-    std::cout << "✓ Test note displayed\n";
+    std::cout << "[OK] Test note displayed\n";
 }
 #endif
 

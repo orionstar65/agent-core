@@ -87,7 +87,7 @@ void test_fresh_start() {
     // State file should now exist
     assert(restart_store->exists());
     
-    std::cout << "✓ Fresh start works correctly\n";
+    std::cout << "[OK] Fresh start works correctly\n";
 }
 
 void test_restart_with_existing_state() {
@@ -119,7 +119,7 @@ void test_restart_with_existing_state() {
     assert(persisted.restart_count == 2);
     restart_store->save(persisted);
     
-    std::cout << "✓ Restart with existing state works correctly\n";
+    std::cout << "[OK] Restart with existing state works correctly\n";
 }
 
 void test_multiple_restarts_to_quarantine() {
@@ -176,7 +176,7 @@ void test_multiple_restarts_to_quarantine() {
         restart_store->save(persisted);
     }
     
-    std::cout << "✓ Quarantine triggered after max restarts\n";
+    std::cout << "[OK] Quarantine triggered after max restarts\n";
 }
 
 void test_quarantine_persistence() {
@@ -197,7 +197,7 @@ void test_quarantine_persistence() {
     auto decision = restart_mgr->should_restart(config);
     assert(decision == RestartDecision::QuarantineActive);
     
-    std::cout << "✓ Quarantine state persists across restarts\n";
+    std::cout << "[OK] Quarantine state persists across restarts\n";
 }
 
 void test_quarantine_expiration() {
@@ -228,7 +228,7 @@ void test_quarantine_expiration() {
     assert(!persisted.in_quarantine);
     restart_store->save(persisted);
     
-    std::cout << "✓ Quarantine expires and state resets\n";
+    std::cout << "[OK] Quarantine expires and state resets\n";
 }
 
 void test_stable_runtime_reset() {
@@ -262,7 +262,7 @@ void test_stable_runtime_reset() {
     restart_store->load(loaded);
     assert(loaded.restart_count == 0);
     
-    std::cout << "✓ Stable runtime reset persists\n";
+    std::cout << "[OK] Stable runtime reset persists\n";
 }
 
 int main() {

@@ -131,7 +131,7 @@ void test_normal_usage() {
     assert(violation.stage == QuotaStage::Normal);
     assert(violation.resource_type.empty());
     
-    std::cout << "✓ Normal usage correctly identified\n";
+    std::cout << "[OK] Normal usage correctly identified\n";
 }
 
 void test_warn_stage() {
@@ -161,7 +161,7 @@ void test_warn_stage() {
     assert(violation.stage == QuotaStage::Warn);
     assert(violation.usage_pct >= 80.0);
     
-    std::cout << "✓ Warn stage correctly identified at " << violation.usage_pct << "%\n";
+    std::cout << "[OK] Warn stage correctly identified at " << violation.usage_pct << "%\n";
 }
 
 void test_throttle_stage() {
@@ -190,7 +190,7 @@ void test_throttle_stage() {
     assert(violation.stage == QuotaStage::Throttle);
     assert(violation.usage_pct >= 90.0);
     
-    std::cout << "✓ Throttle stage correctly identified at " << violation.usage_pct << "%\n";
+    std::cout << "[OK] Throttle stage correctly identified at " << violation.usage_pct << "%\n";
 }
 
 void test_stop_stage() {
@@ -219,7 +219,7 @@ void test_stop_stage() {
     assert(violation.stage == QuotaStage::Stop);
     assert(violation.usage_pct >= 100.0);
     
-    std::cout << "✓ Stop stage correctly identified at " << violation.usage_pct << "%\n";
+    std::cout << "[OK] Stop stage correctly identified at " << violation.usage_pct << "%\n";
 }
 
 void test_critical_extension_whitelist() {
@@ -261,7 +261,7 @@ void test_critical_extension_whitelist() {
     bool stop_called = false;
     // We can't easily mock stop() to check, but we verify the logic exists
     
-    std::cout << "✓ Critical extension whitelist logic verified\n";
+    std::cout << "[OK] Critical extension whitelist logic verified\n";
 }
 
 void test_offender_identification() {
@@ -301,7 +301,7 @@ void test_offender_identification() {
     assert(violation.resource_type == "CPU");
     assert(!violation.offenders.empty());
     
-    std::cout << "✓ Offenders correctly identified: ";
+    std::cout << "[OK] Offenders correctly identified: ";
     for (const auto& offender : violation.offenders) {
         std::cout << offender << " ";
     }
@@ -319,7 +319,7 @@ void test_enforcement_reset() {
     // Reset specific process
     enforcer.reset_enforcement("test-process");
     
-    std::cout << "✓ Enforcement reset works\n";
+    std::cout << "[OK] Enforcement reset works\n";
 }
 
 int main() {

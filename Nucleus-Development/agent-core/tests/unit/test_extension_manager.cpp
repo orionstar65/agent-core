@@ -186,7 +186,7 @@ void test_create_extension_manager() {
     auto status = ext_mgr->status();
     assert(status.empty());
     
-    std::cout << "✓ Extension manager created successfully\n";
+    std::cout << "[OK] Extension manager created successfully\n";
 }
 
 void test_launch_extension() {
@@ -221,7 +221,7 @@ void test_launch_extension() {
     // Clean up
     ext_mgr->stop_all();
     
-    std::cout << "✓ Launch extension test passed\n";
+    std::cout << "[OK] Launch extension test passed\n";
     cleanup_test_dir();
 }
 
@@ -252,7 +252,7 @@ void test_stop_extension() {
     status = ext_mgr->status();
     assert(status["sleep-ext"] == ExtState::Stopped);
     
-    std::cout << "✓ Stop extension test passed\n";
+    std::cout << "[OK] Stop extension test passed\n";
     cleanup_test_dir();
 }
 
@@ -292,7 +292,7 @@ void test_crash_detection() {
     }
     
     ext_mgr->stop_all();
-    std::cout << "✓ Crash detection test passed\n";
+    std::cout << "[OK] Crash detection test passed\n";
     cleanup_test_dir();
 }
 
@@ -344,7 +344,7 @@ void test_quarantine_after_max_restarts() {
     assert(status["always-crash"] == ExtState::Quarantined);
     
     ext_mgr->stop_all();
-    std::cout << "✓ Quarantine after max restarts test passed\n";
+    std::cout << "[OK] Quarantine after max restarts test passed\n";
     cleanup_test_dir();
 }
 
@@ -379,7 +379,7 @@ void test_health_status() {
     std::cout << "  Restart count: " << ext_health.restart_count << "\n";
     
     ext_mgr->stop_all();
-    std::cout << "✓ Health status test passed\n";
+    std::cout << "[OK] Health status test passed\n";
     cleanup_test_dir();
 }
 
@@ -405,7 +405,7 @@ void test_disabled_extension_not_launched() {
     // Disabled extension should not appear in status
     assert(status.empty() || status.count("disabled-ext") == 0);
     
-    std::cout << "✓ Disabled extension not launched\n";
+    std::cout << "[OK] Disabled extension not launched\n";
     cleanup_test_dir();
 }
 
@@ -445,7 +445,7 @@ void test_multiple_extensions() {
     }
     
     ext_mgr->stop_all();
-    std::cout << "✓ Multiple extensions test passed\n";
+    std::cout << "[OK] Multiple extensions test passed\n";
     cleanup_test_dir();
 }
 
@@ -484,7 +484,7 @@ void test_stop_all_extensions() {
     assert(status["ext1"] == ExtState::Stopped);
     assert(status["ext2"] == ExtState::Stopped);
     
-    std::cout << "✓ Stop all extensions test passed\n";
+    std::cout << "[OK] Stop all extensions test passed\n";
     cleanup_test_dir();
 }
 

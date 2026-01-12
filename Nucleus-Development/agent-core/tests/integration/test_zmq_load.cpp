@@ -115,7 +115,7 @@ void test_pubsub_load() {
     assert(lost == 0 && "No messages should be lost in load test");
     assert(received >= sent * 0.999 && "At least 99.9% of messages should be received");
     
-    std::cout << "✓ Test passed: PUB/SUB load test successful\n";
+    std::cout << "[OK] Test passed: PUB/SUB load test successful\n";
 }
 
 void test_reqrep_load() {
@@ -296,7 +296,7 @@ void test_reqrep_load() {
     
     // Note: REQ/REP test may have failures if no responder, which is expected
     // The test verifies the bus can handle the load
-    std::cout << "✓ Test passed: REQ/REP load test completed\n";
+    std::cout << "[OK] Test passed: REQ/REP load test completed\n";
 }
 
 void test_soak() {
@@ -362,7 +362,7 @@ void test_soak() {
     // Verify stability: no loss or minimal loss
     assert(lost == 0 && "No messages should be lost in soak test");
     
-    std::cout << "✓ Test passed: Soak test successful\n";
+    std::cout << "[OK] Test passed: Soak test successful\n";
 }
 
 int main() {

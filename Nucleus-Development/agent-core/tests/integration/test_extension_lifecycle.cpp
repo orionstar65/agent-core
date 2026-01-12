@@ -191,12 +191,12 @@ void test_manifest_loading_and_launch() {
     assert(status["ext1"] == ExtState::Running);
     assert(status["ext2"] == ExtState::Running);
     
-    std::cout << "  ✓ Loaded 2 extensions from manifest\n";
-    std::cout << "  ✓ Both extensions running\n";
+    std::cout << "  [OK] Loaded 2 extensions from manifest\n";
+    std::cout << "  [OK] Both extensions running\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Manifest loading and launch test passed\n";
+    std::cout << "[OK] Manifest loading and launch test passed\n";
 }
 
 // Test 2: Extension crash and automatic restart
@@ -239,12 +239,12 @@ void test_extension_crash_and_restart() {
     
     // Should have restarted at least once
     int restart_count = health["crasher"].restart_count;
-    std::cout << "  ✓ Extension crashed and restarted (restart_count: " << restart_count << ")\n";
+    std::cout << "  [OK] Extension crashed and restarted (restart_count: " << restart_count << ")\n";
     assert(restart_count >= 1);
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Crash and restart test passed\n";
+    std::cout << "[OK] Crash and restart test passed\n";
 }
 
 // Test 3: Extension quarantine after max restarts
@@ -297,11 +297,11 @@ void test_extension_quarantine() {
     }
     
     assert(quarantined);
-    std::cout << "  ✓ Extension quarantined after max restart attempts\n";
+    std::cout << "  [OK] Extension quarantined after max restart attempts\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Quarantine test passed\n";
+    std::cout << "[OK] Quarantine test passed\n";
 }
 
 // Test 4: Multiple extensions with mixed behavior
@@ -344,19 +344,19 @@ void test_multiple_extensions_mixed_behavior() {
     // Stable should still be running
     assert(status["stable"] == ExtState::Running);
     assert(health["stable"].restart_count == 0);
-    std::cout << "  ✓ Stable extension still running\n";
+    std::cout << "  [OK] Stable extension still running\n";
     
     // Crasher should have restarted or be running
     assert(health["crasher"].restart_count >= 1);
-    std::cout << "  ✓ Crasher extension restarted " << health["crasher"].restart_count << " times\n";
+    std::cout << "  [OK] Crasher extension restarted " << health["crasher"].restart_count << " times\n";
     
     // Quick-exit should have crashed and restarted
     assert(health["quick-exit"].restart_count >= 1);
-    std::cout << "  ✓ Quick-exit extension restarted " << health["quick-exit"].restart_count << " times\n";
+    std::cout << "  [OK] Quick-exit extension restarted " << health["quick-exit"].restart_count << " times\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Mixed behavior test passed\n";
+    std::cout << "[OK] Mixed behavior test passed\n";
 }
 
 // Test 5: Health status monitoring
@@ -395,11 +395,11 @@ void test_health_status_monitoring() {
     std::cout << "  State: Running\n";
     std::cout << "  Restart count: " << h.restart_count << "\n";
     std::cout << "  Responding: " << (h.responding ? "yes" : "no") << "\n";
-    std::cout << "  ✓ Health status correctly reported\n";
+    std::cout << "  [OK] Health status correctly reported\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Health status monitoring test passed\n";
+    std::cout << "[OK] Health status monitoring test passed\n";
 }
 
 // Test 6: Disabled extensions are not launched
@@ -439,10 +439,10 @@ void test_disabled_extensions_not_launched() {
     // Disabled extension should not be in status map
     assert(status.empty() || status.count("disabled") == 0);
     
-    std::cout << "  ✓ Disabled extension was not launched\n";
+    std::cout << "  [OK] Disabled extension was not launched\n";
     
     cleanup_test_dir();
-    std::cout << "✓ Disabled extensions test passed\n";
+    std::cout << "[OK] Disabled extensions test passed\n";
 }
 
 // Test 7: Extension recovery from quarantine
@@ -478,7 +478,7 @@ void test_extension_recovery_from_quarantine() {
         auto status = ext_mgr->status();
         if (status["recover"] == ExtState::Quarantined) {
             quarantined = true;
-            std::cout << "  ✓ Extension quarantined\n";
+            std::cout << "  [OK] Extension quarantined\n";
             break;
         }
     }
@@ -499,7 +499,7 @@ void test_extension_recovery_from_quarantine() {
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Recovery from quarantine test passed\n";
+    std::cout << "[OK] Recovery from quarantine test passed\n";
 }
 
 int main() {

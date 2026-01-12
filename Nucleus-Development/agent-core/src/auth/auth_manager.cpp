@@ -104,7 +104,7 @@ public:
             // Success case
             if (response.status_code == 200) {
                 std::cout << "  - Response body: " << response.body << "\n";
-                std::cout << "AuthManager: ✓ Authentication successful\n";
+                std::cout << "AuthManager: [OK] Authentication successful\n";
                 return true;
             }
             

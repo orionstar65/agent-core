@@ -31,7 +31,7 @@ void test_initial_state() {
     assert(state.restart_count == 0);
     assert(!state.in_quarantine);
     
-    std::cout << "✓ Initial state is correct\n";
+    std::cout << "[OK] Initial state is correct\n";
 }
 
 void test_restart_counting() {
@@ -47,7 +47,7 @@ void test_restart_counting() {
         std::cout << "  Restart count: " << state.restart_count << "\n";
     }
     
-    std::cout << "✓ Restart counting works correctly\n";
+    std::cout << "[OK] Restart counting works correctly\n";
 }
 
 void test_quarantine_trigger() {
@@ -67,7 +67,7 @@ void test_quarantine_trigger() {
     assert(decision == RestartDecision::Quarantine);
     assert(restart_mgr->is_quarantined());
     
-    std::cout << "✓ Quarantine triggers after max attempts\n";
+    std::cout << "[OK] Quarantine triggers after max attempts\n";
 }
 
 void test_backoff_calculation() {
@@ -91,7 +91,7 @@ void test_backoff_calculation() {
         prev_delay = delay;
     }
     
-    std::cout << "✓ Backoff calculation works correctly\n";
+    std::cout << "[OK] Backoff calculation works correctly\n";
 }
 
 void test_reset() {
@@ -118,7 +118,7 @@ void test_reset() {
     auto decision = restart_mgr->should_restart(config);
     assert(decision == RestartDecision::AllowRestart);
     
-    std::cout << "✓ Reset works correctly\n";
+    std::cout << "[OK] Reset works correctly\n";
 }
 
 void test_persistence_conversion() {
@@ -144,7 +144,7 @@ void test_persistence_conversion() {
     auto state = restart_mgr2->get_state();
     assert(state.restart_count == 2);
     
-    std::cout << "✓ Persistence conversion works correctly\n";
+    std::cout << "[OK] Persistence conversion works correctly\n";
 }
 
 void test_quarantine_duration() {
@@ -175,7 +175,7 @@ void test_quarantine_duration() {
     assert(decision == RestartDecision::AllowRestart);
     assert(!restart_mgr->is_quarantined());
     
-    std::cout << "✓ Quarantine duration works correctly\n";
+    std::cout << "[OK] Quarantine duration works correctly\n";
 }
 
 int main() {

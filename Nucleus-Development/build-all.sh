@@ -18,7 +18,7 @@ mkdir -p build
 cmake -S . -B build -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 cmake --build build -j$(nproc 2>/dev/null || echo 4)
 cd ..
-echo "✓ Agent Core built"
+echo "[OK] Agent Core built"
 echo ""
 
 # Build Tunnel Extension
@@ -28,7 +28,7 @@ mkdir -p build
 cmake -S . -B build -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 cmake --build build -j$(nproc 2>/dev/null || echo 4)
 cd ../..
-echo "✓ Tunnel Extension built"
+echo "[OK] Tunnel Extension built"
 echo ""
 
 # Build PS-Exec Extension
@@ -38,7 +38,7 @@ mkdir -p build
 cmake -S . -B build -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 cmake --build build -j$(nproc 2>/dev/null || echo 4)
 cd ../..
-echo "✓ PS-Exec Extension built"
+echo "[OK] PS-Exec Extension built"
 echo ""
 
 # Build Sample Extension
@@ -48,7 +48,7 @@ mkdir -p build
 cmake -S . -B build -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 cmake --build build -j$(nproc 2>/dev/null || echo 4)
 cd ../..
-echo "✓ Sample Extension built"
+echo "[OK] Sample Extension built"
 echo ""
 
 echo "================================================"

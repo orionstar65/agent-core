@@ -60,7 +60,7 @@ void test_retry_attempts_metric() {
     assert(metrics_ptr->get_counter("retry.success") == 0 && 
            "Should have 0 successes");
     
-    std::cout << "✓ Retry attempts metric tracked correctly\n";
+    std::cout << "[OK] Retry attempts metric tracked correctly\n";
 }
 
 void test_retry_success_metric() {
@@ -91,7 +91,7 @@ void test_retry_success_metric() {
     assert(metrics_ptr->get_counter("retry.failures") == 0 && 
            "Should have 0 failures");
     
-    std::cout << "✓ Retry success metric tracked correctly\n";
+    std::cout << "[OK] Retry success metric tracked correctly\n";
 }
 
 void test_retry_circuit_breaker_metric() {
@@ -120,7 +120,7 @@ void test_retry_circuit_breaker_metric() {
     assert(metrics_ptr->get_counter("retry.circuit_open") >= 1 && 
            "Should have circuit open event");
     
-    std::cout << "✓ Circuit breaker metric tracked correctly\n";
+    std::cout << "[OK] Circuit breaker metric tracked correctly\n";
 }
 
 void test_retry_without_metrics() {
@@ -141,7 +141,7 @@ void test_retry_without_metrics() {
     
     assert(result && "Should work without metrics");
     
-    std::cout << "✓ Retry works without metrics (backward compatible)\n";
+    std::cout << "[OK] Retry works without metrics (backward compatible)\n";
 }
 
 int main() {

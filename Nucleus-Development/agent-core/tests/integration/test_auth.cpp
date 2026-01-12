@@ -126,7 +126,7 @@ void test_successful_authentication() {
     // If the backend is not accessible, this test will fail, which is correct behavior
     // as it indicates the authentication functionality cannot be verified
     assert(result == CertState::Valid && "Authentication should succeed with valid certificate and backend");
-    std::cout << "✓ Test passed: Successful authentication\n";
+    std::cout << "[OK] Test passed: Successful authentication\n";
 }
 
 void test_missing_serial_number() {
@@ -140,7 +140,7 @@ void test_missing_serial_number() {
     CertState result = auth_manager->ensure_certificate(identity, config);
     
     assert(result == CertState::Failed && "Authentication should fail with empty serial");
-    std::cout << "✓ Test passed: Missing serial number handled correctly\n";
+    std::cout << "[OK] Test passed: Missing serial number handled correctly\n";
 }
 
 void test_missing_uuid() {
@@ -154,7 +154,7 @@ void test_missing_uuid() {
     CertState result = auth_manager->ensure_certificate(identity, config);
     
     assert(result == CertState::Failed && "Authentication should fail with empty UUID");
-    std::cout << "✓ Test passed: Missing UUID handled correctly\n";
+    std::cout << "[OK] Test passed: Missing UUID handled correctly\n";
 }
 
 void test_invalid_cert_path() {
@@ -177,7 +177,7 @@ void test_invalid_cert_path() {
     CertState result = auth_manager->ensure_certificate(identity, config);
     
     assert(result == CertState::Failed && "Authentication should fail with invalid cert path");
-    std::cout << "✓ Test passed: Invalid certificate path handled correctly\n";
+    std::cout << "[OK] Test passed: Invalid certificate path handled correctly\n";
     
     // Restore environment variable
     Config restore_config = create_test_config();
@@ -194,7 +194,7 @@ void test_invalid_backend_url() {
     CertState result = auth_manager->ensure_certificate(identity, config);
     
     assert(result == CertState::Failed && "Authentication should fail with invalid URL");
-    std::cout << "✓ Test passed: Invalid backend URL handled correctly (with retries)\n";
+    std::cout << "[OK] Test passed: Invalid backend URL handled correctly (with retries)\n";
 }
 
 int main() {

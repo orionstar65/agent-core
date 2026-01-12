@@ -85,7 +85,7 @@ void test_zmq_request_reply() {
            "Reply topic should be request topic + .reply");
     
     ext_manager->stop_all();
-    std::cout << "✓ Test passed: ZeroMQ request/reply successful\n";
+    std::cout << "[OK] Test passed: ZeroMQ request/reply successful\n";
 }
 
 void test_zmq_correlation_id_preservation() {
@@ -135,7 +135,7 @@ void test_zmq_correlation_id_preservation() {
            "Correlation ID should be preserved");
     
     ext_manager->stop_all();
-    std::cout << "✓ Test passed: Correlation ID preserved\n";
+    std::cout << "[OK] Test passed: Correlation ID preserved\n";
 }
 
 int main() {

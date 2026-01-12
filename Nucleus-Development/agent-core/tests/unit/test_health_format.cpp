@@ -187,12 +187,12 @@ void test_health_format_running_extensions() {
     assert(json.find("\"responding\":") != std::string::npos);
     assert(json.find("\"agent_uptime_s\":") != std::string::npos);
     
-    std::cout << "  ✓ JSON contains all required fields\n";
-    std::cout << "  ✓ Both extensions reported\n";
+    std::cout << "  [OK] JSON contains all required fields\n";
+    std::cout << "  [OK] Both extensions reported\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Health format test passed\n";
+    std::cout << "[OK] Health format test passed\n";
 }
 
 void test_health_format_no_extensions() {
@@ -212,10 +212,10 @@ void test_health_format_no_extensions() {
     assert(json.find("\"extensions\":[]") != std::string::npos);
     assert(json.find("\"agent_uptime_s\":") != std::string::npos);
     
-    std::cout << "  ✓ Empty extensions array\n";
-    std::cout << "  ✓ Uptime included\n";
+    std::cout << "  [OK] Empty extensions array\n";
+    std::cout << "  [OK] Uptime included\n";
     
-    std::cout << "✓ No extensions health format test passed\n";
+    std::cout << "[OK] No extensions health format test passed\n";
 }
 
 void test_health_format_quarantined_extension() {
@@ -261,11 +261,11 @@ void test_health_format_quarantined_extension() {
     bool has_state_4 = json.find("\"state\":4") != std::string::npos;
     std::cout << "  Extension state: " << (has_state_4 ? "Quarantined (4)" : "Other") << "\n";
     
-    std::cout << "  ✓ Quarantined extension reported\n";
+    std::cout << "  [OK] Quarantined extension reported\n";
     
     ext_mgr->stop_all();
     cleanup_test_dir();
-    std::cout << "✓ Quarantined extension health format test passed\n";
+    std::cout << "[OK] Quarantined extension health format test passed\n";
 }
 
 int main() {

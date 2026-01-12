@@ -113,7 +113,7 @@ void test_check_backend_registration() {
     // We don't assert the value since it depends on backend state,
     // but the call should not throw
     std::cout << "  - Backend registration status: " << (result ? "registered" : "not registered") << "\n";
-    std::cout << "✓ Test passed: Backend registration check completed\n";
+    std::cout << "[OK] Test passed: Backend registration check completed\n";
 }
 
 void test_check_local_registration() {
@@ -125,7 +125,7 @@ void test_check_local_registration() {
     bool result = registration->is_locally_registered();
     
     std::cout << "  - Local SSM agent status: " << (result ? "running" : "not running") << "\n";
-    std::cout << "✓ Test passed: Local registration check completed\n";
+    std::cout << "[OK] Test passed: Local registration check completed\n";
 }
 
 void test_get_activation_info() {
@@ -146,7 +146,7 @@ void test_get_activation_info() {
     std::cout << "  - Activation ID: " << info.activation_id << "\n";
     std::cout << "  - Region: " << info.region << "\n";
     std::cout << "  - Activation Code: [REDACTED - " << info.activation_code.length() << " chars]\n";
-    std::cout << "✓ Test passed: Activation info retrieved successfully\n";
+    std::cout << "[OK] Test passed: Activation info retrieved successfully\n";
 }
 
 void test_get_activation_info_invalid_serial() {
@@ -166,7 +166,7 @@ void test_get_activation_info_invalid_serial() {
     } else {
         std::cout << "  - Backend returned info (may be test backend behavior)\n";
     }
-    std::cout << "✓ Test passed: Invalid serial handled\n";
+    std::cout << "[OK] Test passed: Invalid serial handled\n";
 }
 
 void test_get_activation_info_invalid_cert() {
@@ -190,7 +190,7 @@ void test_get_activation_info_invalid_cert() {
     bool result = registration->get_activation_info(identity, config, info);
     
     assert(!result && "Should fail with invalid certificate path");
-    std::cout << "✓ Test passed: Invalid certificate path handled correctly\n";
+    std::cout << "[OK] Test passed: Invalid certificate path handled correctly\n";
     
     // Restore environment variable
     Config restore_config = create_test_config();
@@ -207,7 +207,7 @@ void test_register_with_ssm_invalid_info() {
     RegistrationState result = registration->register_with_ssm(empty_info);
     
     assert(result == RegistrationState::Failed && "Should fail with empty activation info");
-    std::cout << "✓ Test passed: Empty activation info handled correctly\n";
+    std::cout << "[OK] Test passed: Empty activation info handled correctly\n";
 }
 
 void test_full_registration_flow() {
@@ -229,7 +229,7 @@ void test_full_registration_flow() {
     }
     
     // We don't assert here since this depends on permissions and existing state
-    std::cout << "✓ Test completed: Full registration flow executed\n";
+    std::cout << "[OK] Test completed: Full registration flow executed\n";
 }
 
 void test_backend_url_invalid() {
@@ -243,7 +243,7 @@ void test_backend_url_invalid() {
     bool result = registration->is_device_registered(identity, config);
     
     assert(!result && "Should fail with invalid backend URL");
-    std::cout << "✓ Test passed: Invalid backend URL handled correctly (with retries)\n";
+    std::cout << "[OK] Test passed: Invalid backend URL handled correctly (with retries)\n";
 }
 
 int main(int argc, char* argv[]) {

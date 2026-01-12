@@ -95,7 +95,7 @@ void test_json_logging_fields() {
     assert(timestamp.back() == 'Z' && "timestamp should end with Z");
     assert(timestamp.find('T') != std::string::npos && "timestamp should contain T");
     
-    std::cout << "✓ All required fields present and correct\n";
+    std::cout << "[OK] All required fields present and correct\n";
 }
 
 void test_json_logging_optional_fields() {
@@ -132,7 +132,7 @@ void test_json_logging_optional_fields() {
     assert(log_entry["correlationId"] == "" && "correlationId should be empty string");
     assert(log_entry["eventId"] == "" && "eventId should be empty string");
     
-    std::cout << "✓ Optional fields default to empty strings\n";
+    std::cout << "[OK] Optional fields default to empty strings\n";
 }
 
 void test_log_level_filtering() {
@@ -172,7 +172,7 @@ void test_log_level_filtering() {
     }
     assert(line_count == 2 && "Should have 2 log entries");
     
-    std::cout << "✓ Log level filtering works correctly\n";
+    std::cout << "[OK] Log level filtering works correctly\n";
 }
 
 void test_text_logging_format() {
@@ -197,7 +197,7 @@ void test_text_logging_format() {
     assert(output.find("eventId=evt-789") != std::string::npos && "Should contain eventId");
     assert(output.find("Test message") != std::string::npos && "Should contain message");
     
-    std::cout << "✓ Text logging format is correct\n";
+    std::cout << "[OK] Text logging format is correct\n";
 }
 
 int main() {
