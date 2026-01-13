@@ -13,11 +13,16 @@
 #include <atomic>
 #include <fstream>
 #include <sstream>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#else
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #include <limits.h>
@@ -322,12 +327,21 @@ std::pair<int, std::string> run_command(const std::string& cmd) {
         result += buffer;
     }
     int status = pclose(pipe);
+#ifdef _WIN32
+    return {status, result};
+#else
     return {WEXITSTATUS(status), result};
+#endif
 }
 
 // Helper to check if running as root
 bool is_root() {
+#ifdef _WIN32
+    // On Windows, check if running as administrator
+    return false;  // Simplified - could check for admin privileges
+#else
     return geteuid() == 0;
+#endif
 }
 
 // Helper to check if agent-core service is installed
@@ -345,11 +359,18 @@ bool is_agent_core_running() {
 void clear_agent_core_restart_state() {
     std::cout << "  Clearing agent-core restart state...\n";
     
-    // Create state directory if it doesn't exist
-    mkdir("/var/lib/agent-core", 0755);
+#ifdef _WIN32
+    const std::string state_dir = "C:/tmp/agent-core";
+    const std::string state_file_path = state_dir + "/restart-state.json";
+    _mkdir(state_dir.c_str());
+#else
+    const std::string state_dir = "/var/lib/agent-core";
+    const std::string state_file_path = state_dir + "/restart-state.json";
+    mkdir(state_dir.c_str(), 0755);
+#endif
     
     // Write a clean restart state file
-    std::ofstream state_file("/var/lib/agent-core/restart-state.json");
+    std::ofstream state_file(state_file_path);
     if (state_file) {
         state_file << R"({"restart_count":0,"last_restart_timestamp":0,"in_quarantine":false,"quarantine_start_timestamp":0})";
         state_file.close();
@@ -427,6 +448,13 @@ void uninstall_agent_core_service() {
 }
 
 void test_end_to_end_status_request_flow() {
+#ifdef _WIN32
+    std::cout << "\n=== Test: End-to-End STATUS_REQUEST Flow ===\n";
+    std::cout << "  ⚠ Skipping end-to-end test on Windows (Linux-only test)\n";
+    std::cout << "  This test requires Linux-specific features (systemctl, fork, etc.)\n";
+    return;
+#endif
+
     std::cout << "\n=== Test: End-to-End STATUS_REQUEST Flow ===\n";
     std::cout << "  This test verifies the complete message flow:\n";
     std::cout << "  1. MQTT STATUS_REQUEST published to backend\n";
@@ -481,6 +509,7 @@ void test_end_to_end_status_request_flow() {
         std::cout << "\nStep 2: Starting sample extension...\n";
         
         // Create a pipe to capture extension output
+#ifndef _WIN32
         int pipefd[2];
         if (pipe(pipefd) == -1) {
             std::cerr << "  ✗ Failed to create pipe\n";
@@ -506,10 +535,16 @@ void test_end_to_end_status_request_flow() {
             std::cerr << "Failed to exec sample extension: " << sample_extension_path << "\n";
             _exit(1);
         }
+#else
+        // Windows: Not supported in e2e test
+        assert(false && "Windows not supported for e2e test");
+#endif
         
+#ifndef _WIN32
         // Parent process
         close(pipefd[1]);  // Close write end
         std::cout << "  ✓ Sample extension started (PID: " << extension_pid << ")\n";
+#endif
         
         // Wait for extension to initialize and connect to ZeroMQ
         std::cout << "  ⏳ Waiting for extension to initialize (5 seconds)...\n";
@@ -594,6 +629,7 @@ void test_end_to_end_status_request_flow() {
         
         // Read from pipe (non-blocking)
         std::string extension_output;
+#ifndef _WIN32
         char buffer[1024];
         fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
         ssize_t bytes_read;
@@ -601,7 +637,10 @@ void test_end_to_end_status_request_flow() {
             buffer[bytes_read] = '\0';
             extension_output += buffer;
         }
+#endif
+#ifndef _WIN32
         close(pipefd[0]);
+#endif
         
         std::cout << "  Extension output:\n";
         std::cout << "  ----------------------------------------\n";
@@ -653,10 +692,12 @@ void test_end_to_end_status_request_flow() {
     // Cleanup: Stop sample extension
     if (extension_pid > 0) {
         std::cout << "\nCleanup: Stopping sample extension...\n";
+#ifndef _WIN32
         kill(extension_pid, SIGTERM);
         int status;
         waitpid(extension_pid, &status, 0);
         std::cout << "  ✓ Sample extension stopped\n";
+#endif
     }
     
     // Cleanup: Stop and uninstall agent-core service (restore to pre-test state)

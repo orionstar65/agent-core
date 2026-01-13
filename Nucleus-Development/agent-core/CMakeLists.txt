@@ -46,16 +46,39 @@ set(CURL_STATICLIB ON)
 find_package(CURL REQUIRED)
 
 # Paho MQTT C - prefer /usr/local (newer with WebSocket support)
-find_library(PAHO_MQTT_C_LIB NAMES paho-mqtt3as libpaho-mqtt3as.a
-    PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu
+# On Windows/msys64, also check /ucrt64 paths
+if(WIN32)
+    set(PAHO_SEARCH_PATHS_LIB 
+        /ucrt64/lib 
+        C:/msys64/ucrt64/lib
+        /usr/local/lib 
+        /usr/lib 
+        /usr/lib/x86_64-linux-gnu)
+    set(PAHO_SEARCH_PATHS_INCLUDE 
+        /ucrt64/include 
+        C:/msys64/ucrt64/include
+        /usr/local/include 
+        /usr/include)
+else()
+    set(PAHO_SEARCH_PATHS_LIB 
+        /usr/local/lib 
+        /usr/lib 
+        /usr/lib/x86_64-linux-gnu)
+    set(PAHO_SEARCH_PATHS_INCLUDE 
+        /usr/local/include 
+        /usr/include)
+endif()
+
+find_library(PAHO_MQTT_C_LIB NAMES paho-mqtt3as libpaho-mqtt3as.a paho-mqtt3as.dll.a
+    PATHS ${PAHO_SEARCH_PATHS_LIB}
     NO_DEFAULT_PATH)
 
 # Paho MQTT C++ - check /usr/local first, then system
-find_library(PAHO_MQTT_CPP_LIB NAMES paho-mqttpp3 libpaho-mqttpp3.a
-    PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu)
+find_library(PAHO_MQTT_CPP_LIB NAMES paho-mqttpp3 libpaho-mqttpp3.a libpaho-mqttpp3-static.a paho-mqttpp3.dll.a
+    PATHS ${PAHO_SEARCH_PATHS_LIB})
 
 find_path(PAHO_MQTT_INCLUDE_DIR mqtt/async_client.h
-    PATHS /usr/local/include /usr/include)
+    PATHS ${PAHO_SEARCH_PATHS_INCLUDE})
 
 if(PAHO_MQTT_C_LIB AND PAHO_MQTT_CPP_LIB AND PAHO_MQTT_INCLUDE_DIR)
     set(PAHO_MQTT_FOUND TRUE)
@@ -69,7 +92,11 @@ if(PAHO_MQTT_C_LIB AND PAHO_MQTT_CPP_LIB AND PAHO_MQTT_INCLUDE_DIR)
     endif()
 else()
     set(PAHO_MQTT_FOUND FALSE)
-    message(FATAL_ERROR "Paho MQTT libraries not found! Install: sudo apt-get install libpaho-mqtt-dev libpaho-mqttpp-dev")
+    if(WIN32)
+        message(FATAL_ERROR "Paho MQTT libraries not found! Install via pacman: pacman -S mingw-w64-ucrt-x86_64-paho.mqtt.c, or build from source")
+    else()
+        message(FATAL_ERROR "Paho MQTT libraries not found! Install: sudo apt-get install libpaho-mqtt-dev libpaho-mqttpp-dev")
+    endif()
 endif()
 
 # Include directories
@@ -136,6 +163,11 @@ endif()
 # Platform-specific libraries - ALL STATIC
 if(WIN32)
     target_link_libraries(agent-core PRIVATE ws2_32 crypt32 wldap32 normaliz bcrypt)
+    
+    # OpenSSL (required by CURL, Paho MQTT, and AWS SigV4)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(agent-core PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    message(STATUS "OpenSSL: ${OPENSSL_VERSION}")
 else()
     # Linux system libraries
     target_link_libraries(agent-core PRIVATE pthread rt dl m)

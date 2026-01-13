@@ -5,21 +5,39 @@
 #include <thread>
 #include <chrono>
 #include <fstream>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 using namespace agent;
 
+#ifdef _WIN32
+const std::string TEST_DIR = "C:/tmp/agent-ext-lifecycle-test";
+#else
 const std::string TEST_DIR = "/tmp/agent-ext-lifecycle-test";
+#endif
 const std::string TEST_MANIFEST_PATH = TEST_DIR + "/test_manifest.json";
 
 void setup_test_dir() {
+#ifdef _WIN32
+    system(("rmdir /s /q " + TEST_DIR + " 2>nul").c_str());
+    _mkdir(TEST_DIR.c_str());
+#else
     system(("rm -rf " + TEST_DIR).c_str());
     mkdir(TEST_DIR.c_str(), 0755);
+#endif
 }
 
 void cleanup_test_dir() {
+#ifdef _WIN32
+    system(("rmdir /s /q " + TEST_DIR + " 2>nul").c_str());
+#else
     system(("rm -rf " + TEST_DIR).c_str());
+#endif
 }
 
 void create_test_script(const std::string& name, const std::string& script) {

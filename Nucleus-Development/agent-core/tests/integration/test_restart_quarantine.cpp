@@ -6,26 +6,35 @@
 #include <cstdlib>
 #include <thread>
 #include <chrono>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 using namespace agent;
 
+#ifdef _WIN32
+const std::string TEST_STATE_DIR = "C:/tmp/agent-restart-test";
+#else
 const std::string TEST_STATE_DIR = "/tmp/agent-restart-test";
+#endif
 const std::string TEST_STATE_FILE = TEST_STATE_DIR + "/restart-state.json";
 
 void cleanup_test_state() {
     std::remove(TEST_STATE_FILE.c_str());
+#ifdef _WIN32
+    _rmdir(TEST_STATE_DIR.c_str());
+#else
     rmdir(TEST_STATE_DIR.c_str());
+#endif
 }
 
 void ensure_state_dir() {
 #ifdef _WIN32
-#ifdef _MSC_VER
     _mkdir(TEST_STATE_DIR.c_str());
-#else
-    mkdir(TEST_STATE_DIR.c_str());
-#endif
 #else
     mkdir(TEST_STATE_DIR.c_str(), 0755);
 #endif
